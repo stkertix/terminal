@@ -1,0 +1,46 @@
+{
+  "manifest_version": 3,
+  "name": "Terminal Simulator",
+  "version": "1.0.0",
+  "description": "A classic Unix terminal simulator in its own window.",
+  "action": {
+    "default_title": "Open Terminal",
+    "default_icon": {
+      "16": "icons/icon16.png",
+      "48": "icons/icon48.png",
+      "128": "icons/icon128.png"
+    }
+  },
+  "permissions": ["declarativeNetRequest", "declarativeNetRequestWithHostAccess", "storage"],
+  "optional_host_permissions": ["http://*/*", "https://*/*"],
+  "host_permissions": [
+    "*://*.youtube.com/*",
+    "*://*.youtu.be/*",
+    "*://*.youtube-nocookie.com/*",
+    "*://*.googlevideo.com/*",
+    "*://*.ytimg.com/*",
+    "*://*.ggpht.com/*",
+    "*://*.google.com/*",
+    "*://*.gstatic.com/*",
+    "*://*.googleapis.com/*",
+    "*://*.googleusercontent.com/*"
+  ],
+  "declarative_net_request": {
+    "rule_resources": [
+      {
+        "id": "frame_rules",
+        "enabled": true,
+        "path": "rules.json"
+      }
+    ]
+  },
+  "background": {
+    "service_worker": "src/background.js",
+    "type": "module"
+  },
+  "icons": {
+    "16": "icons/icon16.png",
+    "48": "icons/icon48.png",
+    "128": "icons/icon128.png"
+  }
+}
