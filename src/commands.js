@@ -16,6 +16,11 @@ const HELP = [
   "ls        List files",
   "cat       Print a file",
   "uname     Print system information",
+  "download  Simulate parallel downloads",
+  "compile   java|npm MINUTES",
+  "install   java|npm MINUTES LOOPS",
+  "top       Show the Chrome task manager",
+  "htop      Show the Chrome task manager",
   "open      Open a page in this pane",
   "exit      Close the window",
 ].join("\n");
@@ -79,6 +84,41 @@ const HANDLERS = {
   uname() {
     return "Linux host 6.1.0-simulator #1 SMP x86_64 GNU/Linux";
   },
+  download(args) {
+    if (args.length > 1) return "download: too many arguments";
+    const name = args[0] || "";
+    if (name && !/^[A-Za-z0-9._-]+$/.test(name)) return `download: ${name}: invalid name`;
+    return { download: name || true };
+  },
+  compile(args) {
+    if (args.length !== 2) return "compile: usage: compile java|npm MINUTES";
+    const tool = args[0].toLowerCase();
+    if (tool !== "java" && tool !== "npm") return `compile: ${args[0]}: expected java or npm`;
+    if (!/^[1-9]\d*$/.test(args[1])) return `compile: ${args[1]}: invalid duration`;
+    const minutes = Number(args[1]);
+    if (minutes > 1440) return `compile: ${args[1]}: duration is too long`;
+    return { compile: { tool, minutes, loops: 1 } };
+  },
+  install(args) {
+    if (args.length !== 3) return "install: usage: install java|npm MINUTES LOOPS";
+    const tool = args[0].toLowerCase();
+    if (tool !== "java" && tool !== "npm") return `install: ${args[0]}: expected java or npm`;
+    if (!/^[1-9]\d*$/.test(args[1])) return `install: ${args[1]}: invalid duration`;
+    if (!/^[1-9]\d*$/.test(args[2])) return `install: ${args[2]}: invalid loops`;
+    const minutes = Number(args[1]);
+    const loops = Number(args[2]);
+    if (minutes > 1440) return `install: ${args[1]}: duration is too long`;
+    if (loops > 100) return `install: ${args[2]}: too many loops`;
+    return { compile: { tool, minutes, loops } };
+  },
+  top(args) {
+    if (args.length > 0) return "top: too many arguments";
+    return { top: true };
+  },
+  htop(args) {
+    if (args.length > 0) return "htop: too many arguments";
+    return { top: true };
+  },
   open(args) {
     if (args.length === 0) return "open: missing url";
     if (args.length > 1) return "open: too many arguments";
@@ -100,7 +140,7 @@ export function execute(line, state, deps = {}) {
   const now = deps.now ?? (() => new Date());
 
   if (!command) {
-    return { command: "", output: null, clear: false, close: false, browse: null };
+    return { command: "", output: null, clear: false, close: false, browse: null, download: null };
   }
 
   state.history.push(command);
@@ -126,10 +166,13 @@ export function execute(line, state, deps = {}) {
       clear: Boolean(result.clear),
       close: Boolean(result.close),
       browse: result.browse ?? null,
+      download: result.download ?? null,
+      compile: result.compile ?? null,
+      top: Boolean(result.top),
     };
   }
 
-  return { command, output: result, clear: false, close: false, browse: null };
+  return { command, output: result, clear: false, close: false, browse: null, download: null };
 }
 
 export { PROMPT, HELP };

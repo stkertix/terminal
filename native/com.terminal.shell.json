@@ -1,0 +1,7 @@
+{
+  "name": "com.terminal.shell",
+  "description": "Local shell for Terminal",
+  "path": "/ABSOLUTE/PATH/TO/native/host.py",
+  "type": "stdio",
+  "allowed_origins": ["chrome-extension://EXTENSION_ID/"]
+}

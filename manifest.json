@@ -11,7 +11,8 @@
       "128": "icons/icon128.png"
     }
   },
-  "permissions": ["declarativeNetRequest", "declarativeNetRequestWithHostAccess", "storage"],
+  "permissions": ["declarativeNetRequest", "declarativeNetRequestWithHostAccess", "nativeMessaging", "processes", "storage"],
+  "key": "MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEA0/QUX0rrcCbSPaGM61AymKaMRpyoTTVkxbGWlq4moLu4+9GK+MF7L0q84akBf8fBsdU3HHOGzvnNdFz5eQi+mpa3M2jds6UEUmVr8JbUmNsI5sL0XHLvd7rMOcs1SU66Tl01ArQ4370l0EYp00D4YkLW+TTW+PbIasGDHGfalpcEVWCF2KJfcHAbyteAUyGub3cDL6wXD76D1frY/30zhzYEDQ1+ijVFkGCYeWmNRFzNDPdUl/j26ite0oTCgkSWs5VKHYPihpfbqW7d+W0tciOv9w2MeSNIfiPxtK5ZUPYRbtTXyxT3SZTzted3CbRNWh1BV13Oj8XmsT8J0IzZ/QIDAQAB",
   "optional_host_permissions": ["http://*/*", "https://*/*"],
   "host_permissions": [
     "*://*.youtube.com/*",

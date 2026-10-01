@@ -1,0 +1,7 @@
+{
+  "name": "com.terminal.tasks",
+  "description": "Chrome process list for Terminal",
+  "path": "HOST_PATH",
+  "type": "stdio",
+  "allowed_origins": ["chrome-extension://EXTENSION_ID/"]
+}
