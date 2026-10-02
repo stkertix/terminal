@@ -4,6 +4,19 @@ const FILES = {
   "README.txt": "Terminal simulator.\nType help to list commands.\n",
 };
 
+const COMPILERS = ["java", "npm", "go", "rust", "gcc", "dotnet", "python"];
+const COMPILER_CHOICES = COMPILERS.join("|");
+
+function compilerName(roll) {
+  const index = Math.min(COMPILERS.length - 1, Math.floor(roll() * COMPILERS.length));
+  return COMPILERS[index];
+}
+
+function expectedCompiler(command, name) {
+  const list = COMPILERS.join(", ").replace(/, ([^,]*)$/, ", or $1");
+  return `${command}: ${name}: expected ${list}`;
+}
+
 const HELP = [
   "help      Show this message",
   "clear     Clear the screen",
@@ -17,8 +30,8 @@ const HELP = [
   "cat       Print a file",
   "uname     Print system information",
   "download  Simulate parallel downloads",
-  "compile   java|npm MINUTES",
-  "install   java|npm MINUTES LOOPS",
+  `compile   [${COMPILER_CHOICES} MINUTES]`,
+  `install   ${COMPILER_CHOICES} MINUTES LOOPS`,
   "top       Show the Chrome task manager",
   "htop      Show the Chrome task manager",
   "open      Open a page in this pane",
@@ -90,19 +103,25 @@ const HANDLERS = {
     if (name && !/^[A-Za-z0-9._-]+$/.test(name)) return `download: ${name}: invalid name`;
     return { download: name || true };
   },
-  compile(args) {
-    if (args.length !== 2) return "compile: usage: compile java|npm MINUTES";
+  compile(args, _state, deps) {
+    if (args.length === 0) {
+      const roll = deps.random ?? Math.random;
+      const tool = compilerName(roll);
+      const minutes = 1 + Math.floor(roll() * 25);
+      return { compile: { tool, minutes, loops: 1 } };
+    }
+    if (args.length !== 2) return `compile: usage: compile [${COMPILER_CHOICES} MINUTES]`;
     const tool = args[0].toLowerCase();
-    if (tool !== "java" && tool !== "npm") return `compile: ${args[0]}: expected java or npm`;
+    if (!COMPILERS.includes(tool)) return expectedCompiler("compile", args[0]);
     if (!/^[1-9]\d*$/.test(args[1])) return `compile: ${args[1]}: invalid duration`;
     const minutes = Number(args[1]);
     if (minutes > 1440) return `compile: ${args[1]}: duration is too long`;
     return { compile: { tool, minutes, loops: 1 } };
   },
   install(args) {
-    if (args.length !== 3) return "install: usage: install java|npm MINUTES LOOPS";
+    if (args.length !== 3) return `install: usage: install ${COMPILER_CHOICES} MINUTES LOOPS`;
     const tool = args[0].toLowerCase();
-    if (tool !== "java" && tool !== "npm") return `install: ${args[0]}: expected java or npm`;
+    if (!COMPILERS.includes(tool)) return expectedCompiler("install", args[0]);
     if (!/^[1-9]\d*$/.test(args[1])) return `install: ${args[1]}: invalid duration`;
     if (!/^[1-9]\d*$/.test(args[2])) return `install: ${args[2]}: invalid loops`;
     const minutes = Number(args[1]);
@@ -138,6 +157,7 @@ export function createSession() {
 export function execute(line, state, deps = {}) {
   const command = line.trim();
   const now = deps.now ?? (() => new Date());
+  const random = deps.random ?? Math.random;
 
   if (!command) {
     return { command: "", output: null, clear: false, close: false, browse: null, download: null };
@@ -158,7 +178,7 @@ export function execute(line, state, deps = {}) {
     };
   }
 
-  const result = handler(args, state, { now });
+  const result = handler(args, state, { now, random });
   if (result && typeof result === "object") {
     return {
       command,
@@ -175,4 +195,4 @@ export function execute(line, state, deps = {}) {
   return { command, output: result, clear: false, close: false, browse: null, download: null };
 }
 
-export { PROMPT, HELP };
+export { PROMPT, HELP, COMPILERS };

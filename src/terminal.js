@@ -1,4 +1,4 @@
-import { PROMPT, createSession, execute } from "./commands.js";
+import { COMPILERS, PROMPT, createSession, execute } from "./commands.js";
 import { connectLocalShell } from "./shell.js";
 
 const PANE_COUNT = 4;
@@ -516,15 +516,134 @@ function createPane(index) {
     return lines[Math.floor(Math.random() * lines.length)];
   }
 
+  function goCompileLine() {
+    const packages = ["cmd/app", "internal/net", "internal/parser", "internal/store", "pkg/runtime"];
+    const files = ["main.go", "socket.go", "parser.go", "buffer.go", "task.go", "config.go"];
+    const pkg = packages[Math.floor(Math.random() * packages.length)];
+    const file = files[Math.floor(Math.random() * files.length)];
+    const version = `v1.${Math.floor(Math.random() * 9)}.${Math.floor(Math.random() * 20)}`;
+    const lines = [
+      `compiling ${pkg}/${file}`,
+      `# example.com/app/${pkg}`,
+      `go: downloading example.com/${file.replace(".go", "")} ${version}`,
+    ];
+    return lines[Math.floor(Math.random() * lines.length)];
+  }
+
+  function rustCompileLine() {
+    const crates = [
+      ["app", "0.1.0"],
+      ["serde", "1.0.210"],
+      ["tokio", "1.40.0"],
+      ["libc", "0.2.159"],
+      ["regex", "1.11.0"],
+      ["clap", "4.5.20"],
+    ];
+    const [name, version] = crates[Math.floor(Math.random() * crates.length)];
+    const lines = [`Compiling ${name} v${version}`, `Fresh ${name} v${version}`];
+    return lines[Math.floor(Math.random() * lines.length)];
+  }
+
+  function gccCompileLine() {
+    const files = ["main", "parser", "buffer", "socket", "runtime", "config"];
+    const file = files[Math.floor(Math.random() * files.length)];
+    const lines = [
+      `gcc -c src/${file}.c -o build/${file}.o`,
+      `gcc -c src/${file}.c -O2 -o build/${file}.o`,
+      `cc -c src/${file}.c -o build/${file}.o`,
+    ];
+    return lines[Math.floor(Math.random() * lines.length)];
+  }
+
+  function dotnetCompileLine() {
+    const projects = ["App", "Core", "Net", "Service"];
+    const name = projects[Math.floor(Math.random() * projects.length)];
+    const lines = [
+      `Restore complete (${(0.4 + Math.random() * 3).toFixed(1)}s)`,
+      `${name} -> /home/user/app/bin/Release/net8.0/${name}.dll`,
+      `    ${Math.floor(Math.random() * 3)} Warning(s)`,
+      "    0 Error(s)",
+    ];
+    return lines[Math.floor(Math.random() * lines.length)];
+  }
+
+  function pythonCompileLine() {
+    const modules = ["app/parser.py", "app/runtime.py", "app/config.py", "app/service.py", "app/__init__.py"];
+    const file = modules[Math.floor(Math.random() * modules.length)];
+    const lines = [
+      `Compiling '${file}'...`,
+      "Building wheel for app (pyproject.toml)",
+      "creating dist/app-1.0.0-py3-none-any.whl",
+      "adding 'app/__init__.py'",
+    ];
+    return lines[Math.floor(Math.random() * lines.length)];
+  }
+
+  function compilerProfile(name, duration) {
+    const profiles = {
+      java: {
+        command: "mvn compile",
+        target: "target/app.jar",
+        success: "BUILD SUCCESS",
+        done: "[INFO] BUILD SUCCESS",
+        line: javaCompileLine,
+      },
+      npm: {
+        command: "npm run build",
+        target: "dist/index.js",
+        success: "built",
+        done: `✓ built in ${formatRemaining(duration)}`,
+        line: npmCompileLine,
+      },
+      go: {
+        command: "go build",
+        target: "bin/app",
+        success: "built",
+        done: "built bin/app",
+        line: goCompileLine,
+      },
+      rust: {
+        command: "cargo build",
+        target: "target/release/app",
+        success: "Finished",
+        done: `Finished release [optimized] target(s) in ${formatRemaining(duration)}`,
+        line: rustCompileLine,
+      },
+      gcc: {
+        command: "gcc -o app",
+        target: "app",
+        success: "built",
+        done: "built app",
+        line: gccCompileLine,
+      },
+      dotnet: {
+        command: "dotnet build",
+        target: "bin/Release/app.dll",
+        success: "Build succeeded",
+        done: "Build succeeded.",
+        line: dotnetCompileLine,
+      },
+      python: {
+        command: "python -m build",
+        target: "dist/app.whl",
+        success: "built",
+        done: "Successfully built app",
+        line: pythonCompileLine,
+      },
+    };
+    return profiles[name] ?? profiles.java;
+  }
+
   function startCompile(spec) {
     stopCompile();
-    const tool = spec.tool === "npm" ? "npm" : "java";
     const duration = spec.minutes * 60 * 1000;
+    const tool = COMPILERS.includes(spec.tool) ? spec.tool : "java";
+    const profile = compilerProfile(tool, duration);
     const loops = Number.isInteger(spec.loops) && spec.loops > 0 ? spec.loops : 1;
-    const target = tool === "npm" ? "dist/index.js" : "target/app.jar";
-    const nextLine = tool === "npm" ? npmCompileLine : javaCompileLine;
-    const doneLine = tool === "npm" ? `✓ built in ${formatRemaining(duration)}` : "[INFO] BUILD SUCCESS";
-    const running = tool === "npm" ? "npm run build" : "mvn compile";
+    const target = profile.target;
+    const nextLine = profile.line;
+    const doneLine = profile.done;
+    const running = profile.command;
     let loop = 1;
     const heading = () => (loops > 1 ? `${running} ${loop}/${loops}` : running);
     const panel = document.createElement("div");
@@ -681,7 +800,7 @@ function createPane(index) {
         row.classList.add("is-done");
         status.textContent = "100% · 0s";
         pushCompileLine(doneLine);
-        title.textContent = tool === "npm" ? "built" : "BUILD SUCCESS";
+        title.textContent = profile.success;
         showCompileSummary(title.textContent);
         compileJob = null;
         stopCompile();
