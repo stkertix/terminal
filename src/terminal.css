@@ -462,6 +462,11 @@ body.is-moving-pane .screen {
   color: #7ddea0;
 }
 
+.scrollback.is-monitor > :not(.monitor),
+.scrollback.is-compile > :not(.compile) {
+  display: none !important;
+}
+
 .row {
   display: flex;
   gap: 0.6em;
@@ -494,6 +499,16 @@ body.is-moving-pane .screen {
 .compile {
   width: 100%;
   min-width: 0;
+}
+
+.compile-live {
+  display: grid;
+  gap: 8px;
+  min-width: 0;
+}
+
+.compile-live[hidden] {
+  display: none;
 }
 
 .download-title,
@@ -654,6 +669,8 @@ body.is-moving-pane .screen {
 .monitor {
   display: grid;
   gap: 8px;
+  width: 100%;
+  min-width: 0;
   margin: 6px 0 8px;
   white-space: normal;
   word-break: normal;
@@ -662,6 +679,10 @@ body.is-moving-pane .screen {
 .monitor-chart {
   display: grid;
   gap: 2px;
+}
+
+.monitor-chart[hidden] {
+  display: none;
 }
 
 .monitor-chart-title {
