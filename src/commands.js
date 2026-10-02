@@ -5,6 +5,7 @@ const FILES = {
 };
 
 const COMPILERS = ["java", "npm", "go", "rust", "gcc", "dotnet", "python"];
+const CHARTS = ["bar-horizontal", "bar-vertical", "line", "heatmap"];
 const COMPILER_CHOICES = COMPILERS.join("|");
 
 function compilerName(roll) {
@@ -32,6 +33,7 @@ const HELP = [
   "download  Simulate parallel downloads",
   `compile   [${COMPILER_CHOICES} MINUTES]`,
   `install   ${COMPILER_CHOICES} MINUTES LOOPS`,
+  `monitor   [${CHARTS.join("|")}]`,
   "top       Show the Chrome task manager",
   "htop      Show the Chrome task manager",
   "open      Open a page in this pane",
@@ -130,6 +132,12 @@ const HANDLERS = {
     if (loops > 100) return `install: ${args[2]}: too many loops`;
     return { compile: { tool, minutes, loops } };
   },
+  monitor(args) {
+    if (args.length > 1) return `monitor: usage: monitor [${CHARTS.join("|")}]`;
+    const chart = args[0] || "line";
+    if (!CHARTS.includes(chart)) return `monitor: ${args[0]}: expected ${CHARTS.join(", ").replace(/, ([^,]*)$/, ", or $1")}`;
+    return { monitor: chart };
+  },
   top(args) {
     if (args.length > 0) return "top: too many arguments";
     return { top: true };
@@ -188,6 +196,7 @@ export function execute(line, state, deps = {}) {
       browse: result.browse ?? null,
       download: result.download ?? null,
       compile: result.compile ?? null,
+      monitor: typeof result.monitor === "string" ? result.monitor : null,
       top: Boolean(result.top),
     };
   }

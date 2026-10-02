@@ -36,7 +36,7 @@ The toolbar switches among **Single**, **Columns**, **Rows**, and **Grid**. Drag
 
 Each pane has a **Shell** / **Simulator** switch. Shell is tried first. If native messaging is missing or the host is not installed, the pane stays on the simulator.
 
-**Ctrl+L** clears the simulator screen. **Ctrl+C** stops a running simulator download, compile, or install. The prompt is hidden while one of those jobs is running. Arrow up and down walk the command history of that pane.
+**Ctrl+L** clears the simulator screen. **Ctrl+C** stops a running simulator download, compile, install, or monitor. The prompt is hidden while one of those jobs is running. Arrow up and down walk the command history of that pane.
 
 ## Simulator commands
 
@@ -56,6 +56,7 @@ Each pane has a **Shell** / **Simulator** switch. Shell is tried first. If nativ
 | `download [name]`            | Simulate parallel downloads                         |
 | `compile [TOOL MINUTES]`     | Simulate a build                                    |
 | `install TOOL MINUTES LOOPS` | Run that compile the given number of times          |
+| `monitor [CHART]`            | Show a fake host dashboard                          |
 | `top`, `htop`                | Show the Chrome task manager                        |
 | `open <url>`                 | Open a page in this pane                            |
 | `exit`                       | Close this tab, or the window if it is the last tab |
@@ -63,6 +64,8 @@ Each pane has a **Shell** / **Simulator** switch. Shell is tried first. If nativ
 `download` with no name queues several files. An optional name is used for the first file. Each item shows the file name, percent, remaining time, an `.onion` URL, a progress bar, and a package log. Durations are random from 1 to 25 minutes, and the downloads run together.
 
 `compile` with no arguments picks a tool at random and runs for 1 to 25 minutes. Tools are `java`, `npm`, `go`, `rust`, `gcc`, `dotnet`, and `python`. `compile go 10` runs that build for the given number of minutes (1–1440). The log fills the pane. Each line starts with `[YYYY-MM-DD hh:mm:ss:zzz]`. The next line waits 1 ms (50%), 50 ms (30%), 100 ms (10%), 500 ms (5%), or 3000 ms (5%). Only the level label is colored: `[INFO]` blue, `[DEBUG]` green, `[WARN]` yellow, and `[ERROR]` red. The rest of the line stays gray. `install rust 5 3` repeats that compile three times (up to 100 loops). When the job finishes or **Ctrl+C** stops it, the pane shows a summary with the result, command, target, elapsed time, loops, and finish time.
+
+`monitor` shows a CPU chart of the last 48 seconds. The chart argument is `line` (the default), `bar-horizontal`, `bar-vertical`, or `heatmap`. Bar marks use `░ ▒ ▓ █`. The line chart uses braille dots, four dots high in each row, so the curve is finer. Low values are purple, then indigo, blue, green, yellow, and orange, up to red for the highest values. The heatmap sorts its blocks with selection sort. The scan starts at the top left and moves toward the bottom right. When it finds the next color in order, that block swaps into place, so purple, indigo, blue, green, yellow, orange, and red gather into bands. The pass starts again at the end. Line and bar charts move about once a second. **Ctrl+C** freezes the chart.
 
 `top` and `htop` read Chrome process stats. On Chrome Dev they use `chrome.processes`. On stable Chrome they use the `com.terminal.tasks` host, which runs `ps`.
 

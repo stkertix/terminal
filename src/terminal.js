@@ -110,6 +110,8 @@ function createPane(index) {
   let compileLogNode = null;
   let downloadJob = null;
   let compileJob = null;
+  let monitorJob = null;
+  let monitorTimer = 0;
   let taskListener = null;
   let taskEvent = null;
   let taskPort = null;
@@ -280,8 +282,12 @@ function createPane(index) {
     compileLogNode = null;
   }
 
+  function hasJob() {
+    return Boolean(downloadJob || compileJob || monitorJob);
+  }
+
   function syncBusy() {
-    const busy = Boolean(downloadJob || compileJob);
+    const busy = hasJob();
     element.classList.toggle("is-busy", busy);
     if (busy) {
       if (document.activeElement === input) element.focus();
@@ -293,7 +299,7 @@ function createPane(index) {
   function isJobInterrupt(event) {
     if (event.key !== "c" && event.key !== "C") return false;
     if (!event.ctrlKey || event.metaKey || event.altKey || event.shiftKey) return false;
-    if (mode !== "simulator" || (!downloadJob && !compileJob)) return false;
+    if (mode !== "simulator" || !hasJob()) return false;
     if (window.getSelection()?.toString()) return false;
     return true;
   }
@@ -301,10 +307,13 @@ function createPane(index) {
   function interruptJobs() {
     downloadJob?.stop();
     compileJob?.stop();
+    monitorJob?.stop();
     downloadJob = null;
     compileJob = null;
+    monitorJob = null;
     stopDownload();
     stopCompile();
+    stopMonitor();
     syncBusy();
   }
 
@@ -1041,11 +1050,259 @@ function createPane(index) {
     });
   }
 
+  function stopMonitor() {
+    clearInterval(monitorTimer);
+    monitorTimer = 0;
+  }
+
+  function startMonitor(chart) {
+    stopMonitor();
+    const stats = { cpu: 28 };
+    const historyLimit = 48;
+    const history = [];
+    const meterWidth = 24;
+    const nudge = (value, min, max, step) => Math.min(max, Math.max(min, value + (Math.random() * 2 - 1) * step));
+    let seeded = stats.cpu;
+    for (let point = 0; point < historyLimit; point += 1) {
+      seeded = nudge(seeded, 4, 98, 8);
+      history.push(seeded);
+    }
+    stats.cpu = history[history.length - 1];
+
+    const panel = document.createElement("div");
+    panel.className = "output monitor";
+    const chartTitle = document.createElement("div");
+    chartTitle.className = "monitor-chart-title";
+    const plot = document.createElement("div");
+    plot.className = "monitor-plot";
+    const chartHeight = 8;
+    const defragCols = historyLimit;
+    const defragTotal = chartHeight * defragCols;
+    const defragTones = ["is-purple", "is-indigo", "is-blue", "is-green", "is-yellow", "is-orange", "is-red"];
+    let defragCells = [];
+    let defragLeft = [];
+    let sortI = 0;
+    let sortJ = 0;
+    let sortHold = 0;
+    const seedDefrag = () => {
+      const counts = [];
+      let remaining = defragTotal;
+      defragTones.forEach((_, index) => {
+        if (index === defragTones.length - 1) {
+          counts.push(remaining);
+          return;
+        }
+        const share = Math.round((remaining / (defragTones.length - index)) * (0.75 + Math.random() * 0.5));
+        const count = Math.max(1, Math.min(remaining - (defragTones.length - index - 1), share));
+        counts.push(count);
+        remaining -= count;
+      });
+      defragCells = counts.flatMap((count, tone) => Array(count).fill(tone));
+      for (let index = defragCells.length - 1; index > 0; index -= 1) {
+        const swap = Math.floor(Math.random() * (index + 1));
+        const current = defragCells[index];
+        defragCells[index] = defragCells[swap];
+        defragCells[swap] = current;
+      }
+      defragLeft = counts.slice();
+      sortI = 0;
+      sortJ = 0;
+      sortHold = 0;
+    };
+    if (chart === "heatmap") seedDefrag();
+    const plotRows = [];
+    const plotAxes = [];
+    for (let row = 0; row < chartHeight; row += 1) {
+      const line = document.createElement("div");
+      line.className = "monitor-plot-row";
+      const axis = document.createElement("span");
+      axis.className = "monitor-plot-axis";
+      const marks = document.createElement("span");
+      marks.className = "monitor-plot-marks";
+      line.append(axis, marks);
+      plot.append(line);
+      plotAxes.push(axis);
+      plotRows.push(marks);
+    }
+    const chartPanel = document.createElement("div");
+    chartPanel.className = "monitor-chart";
+    chartPanel.append(chartTitle, plot);
+    panel.append(chartPanel);
+    scrollback.insertBefore(panel, form);
+    scrollToEnd();
+
+    const paint = () => {
+      chartTitle.textContent = `CPU · last 48s · ${chart}`;
+      const blocks = ["░", "▒", "▓", "█"];
+      const tones = ["is-purple", "is-indigo", "is-blue", "is-green", "is-yellow", "is-orange", "is-red"];
+      const blank = { glyph: " ", tone: "" };
+      const blockOf = (value) => {
+        const steps = blocks.length * tones.length;
+        const index = Math.min(steps - 1, Math.round((Math.min(100, Math.max(0, value)) / 100) * (steps - 1)));
+        return { glyph: blocks[index % blocks.length], tone: tones[Math.floor(index / blocks.length)] };
+      };
+      const paintCells = (marks, cells) => {
+        marks.replaceChildren(...cells.map((cell) => {
+          const span = document.createElement("span");
+          if (cell.tone) span.className = `monitor-cell ${cell.tone}`;
+          else if (cell.glyph.length > 1) span.className = "monitor-plot-label";
+          span.textContent = cell.glyph;
+          return span;
+        }));
+      };
+      if (chart === "bar-horizontal") {
+        const size = Math.ceil(history.length / chartHeight);
+        plotRows.forEach((marks, index) => {
+          const slice = history.slice(index * size, (index + 1) * size);
+          const average = slice.reduce((sum, value) => sum + value, 0) / (slice.length || 1);
+          const ago = index === chartHeight - 1 ? 0 : (chartHeight - index) * size;
+          plotAxes[index].textContent = (ago === 0 ? "now" : `-${ago}s`).padStart(5, " ");
+          const filled = Math.round((average / 100) * meterWidth);
+          const cell = blockOf(average);
+          const cells = Array.from({ length: meterWidth }, (_, column) => (column < filled ? cell : blank));
+          cells.push({ glyph: ` ${average.toFixed(0)}%`, tone: "" });
+          paintCells(marks, cells);
+        });
+      } else {
+        plotAxes.forEach((axis, index) => {
+          const row = chartHeight - 1 - index;
+          axis.textContent = row === chartHeight - 1 ? "  100" : row === 0 ? "    0" : "     ";
+        });
+        const rowOf = (value) => Math.min(chartHeight - 1, Math.max(0, Math.round((value / 100) * (chartHeight - 1))));
+        const grid = Array.from({ length: chartHeight }, () => Array.from({ length: history.length }, () => blank));
+        if (chart === "bar-vertical") {
+          history.forEach((value, column) => {
+            const cell = blockOf(value);
+            const top = rowOf(value);
+            for (let span = 0; span <= top; span += 1) grid[span][column] = cell;
+          });
+        } else if (chart === "heatmap") {
+          const percent = Math.min(100, Math.round((sortI / defragTotal) * 100));
+          chartTitle.textContent = `sort · ${percent}%`;
+          const running = sortI < defragTotal;
+          plotRows.forEach((marks, row) => {
+            plotAxes[row].className = "monitor-plot-axis";
+            plotAxes[row].textContent = "     ";
+            const cells = Array.from({ length: defragCols }, (_, column) => {
+              const index = row * defragCols + column;
+              const scanning = running && index === sortJ && sortJ !== sortI;
+              const placing = running && index === sortI;
+              const glyph = placing ? "▓" : scanning ? "▒" : "█";
+              return { glyph, tone: defragTones[defragCells[index]] };
+            });
+            paintCells(marks, cells);
+          });
+          return;
+        } else {
+          const yRes = chartHeight * 4;
+          const masks = Array.from({ length: chartHeight }, () => Array(history.length).fill(0));
+          const cellValue = Array.from({ length: chartHeight }, () => Array(history.length).fill(0));
+          const dotBits = [0x01, 0x02, 0x04, 0x40];
+          const yOf = (value) => Math.min(yRes - 1, Math.max(0, Math.round((value / 100) * (yRes - 1))));
+          const mark = (x, y, value) => {
+            const fromTop = yRes - 1 - y;
+            const row = Math.floor(fromTop / 4);
+            masks[row][x] |= dotBits[fromTop % 4];
+            cellValue[row][x] = value;
+          };
+          const stroke = (x0, y0, x1, y1, value) => {
+            const steps = Math.max(Math.abs(x1 - x0), Math.abs(y1 - y0), 1);
+            for (let step = 0; step <= steps; step += 1) {
+              const t = step / steps;
+              mark(Math.round(x0 + (x1 - x0) * t), Math.round(y0 + (y1 - y0) * t), value);
+            }
+          };
+          history.forEach((value, column) => {
+            const y = yOf(value);
+            if (column === 0) mark(0, y, value);
+            else stroke(column - 1, yOf(history[column - 1]), column, y, value);
+          });
+          plotRows.forEach((marks, index) => {
+            paintCells(marks, masks[index].map((mask, column) => (
+              mask ? { glyph: String.fromCharCode(0x2800 + mask), tone: blockOf(cellValue[index][column]).tone } : blank
+            )));
+          });
+          return;
+        }
+        plotRows.forEach((marks, index) => {
+          paintCells(marks, grid[chartHeight - 1 - index]);
+        });
+      }
+    };
+    const tick = () => {
+      stats.cpu = nudge(stats.cpu, 4, 98, 8);
+      history.push(stats.cpu);
+      if (history.length > historyLimit) history.shift();
+      paint();
+    };
+    const advanceDefrag = () => {
+      if (sortHold > 0) {
+        sortHold -= 1;
+        if (sortHold === 0) seedDefrag();
+        paint();
+        return;
+      }
+      const target = defragLeft.findIndex((count) => count > 0);
+      if (target < 0) {
+        sortI = defragTotal;
+        sortHold = 24;
+        paint();
+        return;
+      }
+      for (let step = 0; step < 8 && sortI < defragTotal; step += 1) {
+        if (defragCells[sortI] === target) {
+          defragLeft[target] -= 1;
+          sortI += 1;
+          sortJ = sortI;
+          continue;
+        }
+        if (sortJ <= sortI) sortJ = sortI + 1;
+        if (sortJ >= defragTotal) {
+          sortJ = sortI + 1;
+          break;
+        }
+        if (defragCells[sortJ] === target) {
+          const current = defragCells[sortI];
+          defragCells[sortI] = defragCells[sortJ];
+          defragCells[sortJ] = current;
+          defragLeft[target] -= 1;
+          sortI += 1;
+          sortJ = sortI;
+          continue;
+        }
+        sortJ += 1;
+      }
+      if (sortI >= defragTotal) sortHold = 24;
+      paint();
+    };
+    paint();
+    monitorTimer = setInterval(() => {
+      if (!panel.isConnected) {
+        monitorJob = null;
+        stopMonitor();
+        syncBusy();
+        return;
+      }
+      if (chart === "heatmap") advanceDefrag();
+      else tick();
+    }, chart === "heatmap" ? 90 : 1000);
+
+    monitorJob = {
+      stop() {
+        chartTitle.textContent = "Stopped";
+        stopMonitor();
+      },
+    };
+    syncBusy();
+  }
+
   function clearScreen() {
     downloadJob = null;
     compileJob = null;
+    monitorJob = null;
     stopDownload();
     stopCompile();
+    stopMonitor();
     syncBusy();
     stopTaskManager();
     scrollback.querySelectorAll(".row, .output").forEach((node) => node.remove());
@@ -1076,6 +1333,7 @@ function createPane(index) {
     stopTaskManager();
     appendInput(result.command);
     if (result.top) startTaskManager();
+    else if (result.monitor) startMonitor(result.monitor);
     else if (result.download) startDownload(result.download);
     else if (result.compile) startCompile(result.compile);
     else if (result.output !== null) appendOutput(result.output);
@@ -1303,7 +1561,7 @@ function createPane(index) {
 
   form.addEventListener("submit", (event) => {
     event.preventDefault();
-    if (mode !== "simulator" || downloadJob || compileJob) return;
+    if (mode !== "simulator" || hasJob()) return;
     const line = input.value;
     input.value = "";
     run(line);
@@ -1343,7 +1601,7 @@ function createPane(index) {
   screen.addEventListener("click", () => {
     if (window.getSelection()?.toString()) return;
     if (element.classList.contains("is-shell")) focusShell();
-    else if (downloadJob || compileJob) element.focus();
+    else if (hasJob()) element.focus();
     else input.focus();
   });
 

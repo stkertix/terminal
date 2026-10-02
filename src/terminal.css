@@ -651,6 +651,65 @@ body.is-moving-pane .screen {
   background: #3dd68c;
 }
 
+.monitor {
+  display: grid;
+  gap: 8px;
+  margin: 6px 0 8px;
+  white-space: normal;
+  word-break: normal;
+}
+
+.monitor-chart {
+  display: grid;
+  gap: 2px;
+}
+
+.monitor-chart-title {
+  color: #b5b5b5;
+}
+
+.monitor-plot {
+  display: grid;
+}
+
+.monitor-plot-row {
+  display: grid;
+  grid-template-columns: 5ch minmax(0, max-content);
+  height: 14px;
+  line-height: 14px;
+  white-space: pre;
+}
+
+.monitor-plot-axis {
+  color: #8a8a8a;
+}
+
+.monitor-plot-marks {
+  color: #8a8a8a;
+  overflow: hidden;
+}
+
+.monitor-cell {
+  display: inline-block;
+  width: 1ch;
+  text-align: center;
+}
+
+.monitor-cell.is-red,
+.monitor-plot-axis.is-red { color: #ff4d4d; }
+.monitor-cell.is-orange,
+.monitor-plot-axis.is-orange { color: #ff9a3c; }
+.monitor-cell.is-yellow,
+.monitor-plot-axis.is-yellow { color: #f5d76e; }
+.monitor-cell.is-green,
+.monitor-plot-axis.is-green { color: #3dd68c; }
+.monitor-cell.is-blue,
+.monitor-plot-axis.is-blue { color: #4da3ff; }
+.monitor-cell.is-indigo,
+.monitor-plot-axis.is-indigo { color: #6d6dff; }
+.monitor-cell.is-purple,
+.monitor-plot-axis.is-purple { color: #c084fc; }
+
 .taskman {
   display: grid;
   gap: 6px;
