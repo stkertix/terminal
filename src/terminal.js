@@ -312,6 +312,15 @@ function createPane(index) {
     return min + Math.floor(Math.random() * (max - min + 1));
   }
 
+  function compileLogDelay() {
+    const roll = Math.random() * 100;
+    if (roll < 50) return 1;
+    if (roll < 80) return 100;
+    if (roll < 90) return 1000;
+    if (roll < 95) return 2000;
+    return 3000;
+  }
+
   function formatRemaining(ms) {
     const total = Math.max(0, Math.ceil(ms / 1000));
     const minutes = Math.floor(total / 60);
@@ -752,7 +761,7 @@ function createPane(index) {
         }
         pushCompileLine(nextLine());
         scheduleCompileLog();
-      }, randomLogDelay(100, 1000));
+      }, compileLogDelay());
     };
     scheduleCompileLog();
 
