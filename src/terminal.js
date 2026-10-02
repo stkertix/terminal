@@ -315,9 +315,9 @@ function createPane(index) {
   function compileLogDelay() {
     const roll = Math.random() * 100;
     if (roll < 50) return 1;
-    if (roll < 80) return 100;
-    if (roll < 90) return 1000;
-    if (roll < 95) return 2000;
+    if (roll < 80) return 50;
+    if (roll < 90) return 100;
+    if (roll < 95) return 500;
     return 3000;
   }
 
@@ -490,6 +490,14 @@ function createPane(index) {
     return `${date} ${time}`;
   }
 
+  function logLine(level, text) {
+    return { level, message: `[${level.toUpperCase()}] ${text}` };
+  }
+
+  function pickLog(lines) {
+    return lines[Math.floor(Math.random() * lines.length)];
+  }
+
   function javaCompileLine() {
     const packages = ["com.example.app", "com.example.core", "com.example.net", "com.example.io", "org.example.service"];
     const types = ["Application", "Buffer", "Socket", "Token", "Parser", "Window", "Task", "Stream", "Table", "Lexer", "Runtime", "Config", "Service", "Handler", "Repository"];
@@ -497,12 +505,12 @@ function createPane(index) {
     const type = `${types[Math.floor(Math.random() * types.length)]}${Math.floor(Math.random() * 40)}`;
     const path = `src/main/java/${pkg.replaceAll(".", "/")}/${type}.java`;
     const count = 20 + Math.floor(Math.random() * 180);
-    const lines = [
-      `[INFO] Compiling ${path}`,
-      `[INFO] Compiling ${count} source files with javac [debug release 17] to target/classes`,
-      `[INFO] Changes detected - recompiling the module! ${path}`,
-    ];
-    return lines[Math.floor(Math.random() * lines.length)];
+    return pickLog([
+      logLine("info", `Compiling ${path}`),
+      logLine("debug", `Compiling ${count} source files with javac [debug release 17] to target/classes`),
+      logLine("warn", `Changes detected - recompiling the module! ${path}`),
+      logLine("error", `Failed to compile ${path}`),
+    ]);
   }
 
   function npmCompileLine() {
@@ -515,14 +523,15 @@ function createPane(index) {
     const size = (8 + Math.random() * 240).toFixed(2);
     const gzip = (Number(size) * 0.32).toFixed(2);
     const hash = crypto.randomUUID().slice(0, 8);
-    const lines = [
-      `transforming ${file}`,
-      `✓ ${modules} modules transformed.`,
-      "rendering chunks...",
-      "computing gzip size...",
-      `dist/assets/${stem}-${hash}.js   ${size} kB │ gzip: ${gzip} kB`,
-    ];
-    return lines[Math.floor(Math.random() * lines.length)];
+    return pickLog([
+      logLine("info", `transforming ${file}`),
+      logLine("debug", `${modules} modules transformed.`),
+      logLine("info", "rendering chunks..."),
+      logLine("debug", "computing gzip size..."),
+      logLine("info", `dist/assets/${stem}-${hash}.js   ${size} kB │ gzip: ${gzip} kB`),
+      logLine("warn", `${file} is larger than the recommended size`),
+      logLine("error", `failed to resolve import from ${file}`),
+    ]);
   }
 
   function goCompileLine() {
@@ -531,12 +540,14 @@ function createPane(index) {
     const pkg = packages[Math.floor(Math.random() * packages.length)];
     const file = files[Math.floor(Math.random() * files.length)];
     const version = `v1.${Math.floor(Math.random() * 9)}.${Math.floor(Math.random() * 20)}`;
-    const lines = [
-      `compiling ${pkg}/${file}`,
-      `# example.com/app/${pkg}`,
-      `go: downloading example.com/${file.replace(".go", "")} ${version}`,
-    ];
-    return lines[Math.floor(Math.random() * lines.length)];
+    const moduleName = file.replace(".go", "");
+    return pickLog([
+      logLine("info", `compiling ${pkg}/${file}`),
+      logLine("debug", `example.com/app/${pkg}`),
+      logLine("debug", `go: downloading example.com/${moduleName} ${version}`),
+      logLine("warn", `${pkg}/${file} uses a deprecated API`),
+      logLine("error", `${pkg}: build failed`),
+    ]);
   }
 
   function rustCompileLine() {
@@ -549,43 +560,49 @@ function createPane(index) {
       ["clap", "4.5.20"],
     ];
     const [name, version] = crates[Math.floor(Math.random() * crates.length)];
-    const lines = [`Compiling ${name} v${version}`, `Fresh ${name} v${version}`];
-    return lines[Math.floor(Math.random() * lines.length)];
+    return pickLog([
+      logLine("info", `Compiling ${name} v${version}`),
+      logLine("debug", `Fresh ${name} v${version}`),
+      logLine("warn", `${name} v${version} will be rejected in a future release`),
+      logLine("error", `could not compile ${name} v${version}`),
+    ]);
   }
 
   function gccCompileLine() {
     const files = ["main", "parser", "buffer", "socket", "runtime", "config"];
     const file = files[Math.floor(Math.random() * files.length)];
-    const lines = [
-      `gcc -c src/${file}.c -o build/${file}.o`,
-      `gcc -c src/${file}.c -O2 -o build/${file}.o`,
-      `cc -c src/${file}.c -o build/${file}.o`,
-    ];
-    return lines[Math.floor(Math.random() * lines.length)];
+    return pickLog([
+      logLine("info", `gcc -c src/${file}.c -o build/${file}.o`),
+      logLine("debug", `gcc -c src/${file}.c -O2 -o build/${file}.o`),
+      logLine("debug", `cc -c src/${file}.c -o build/${file}.o`),
+      logLine("warn", `src/${file}.c: unused variable`),
+      logLine("error", `src/${file}.c: error: undeclared identifier`),
+    ]);
   }
 
   function dotnetCompileLine() {
     const projects = ["App", "Core", "Net", "Service"];
     const name = projects[Math.floor(Math.random() * projects.length)];
-    const lines = [
-      `Restore complete (${(0.4 + Math.random() * 3).toFixed(1)}s)`,
-      `${name} -> /home/user/app/bin/Release/net8.0/${name}.dll`,
-      `    ${Math.floor(Math.random() * 3)} Warning(s)`,
-      "    0 Error(s)",
-    ];
-    return lines[Math.floor(Math.random() * lines.length)];
+    const warnings = Math.floor(Math.random() * 3);
+    return pickLog([
+      logLine("info", `Restore complete (${(0.4 + Math.random() * 3).toFixed(1)}s)`),
+      logLine("debug", `${name} -> /home/user/app/bin/Release/net8.0/${name}.dll`),
+      logLine("warn", `${warnings} Warning(s)`),
+      logLine("error", `${name}: error CS0103: The name does not exist`),
+    ]);
   }
 
   function pythonCompileLine() {
     const modules = ["app/parser.py", "app/runtime.py", "app/config.py", "app/service.py", "app/__init__.py"];
     const file = modules[Math.floor(Math.random() * modules.length)];
-    const lines = [
-      `Compiling '${file}'...`,
-      "Building wheel for app (pyproject.toml)",
-      "creating dist/app-1.0.0-py3-none-any.whl",
-      "adding 'app/__init__.py'",
-    ];
-    return lines[Math.floor(Math.random() * lines.length)];
+    return pickLog([
+      logLine("info", `Compiling '${file}'...`),
+      logLine("debug", "Building wheel for app (pyproject.toml)"),
+      logLine("info", "creating dist/app-1.0.0-py3-none-any.whl"),
+      logLine("debug", "adding 'app/__init__.py'"),
+      logLine("warn", `${file}: SyntaxWarning: invalid escape sequence`),
+      logLine("error", `error: ${file} failed to compile`),
+    ]);
   }
 
   function compilerProfile(name, duration) {
@@ -594,49 +611,49 @@ function createPane(index) {
         command: "mvn compile",
         target: "target/app.jar",
         success: "BUILD SUCCESS",
-        done: "[INFO] BUILD SUCCESS",
+        done: logLine("info", "BUILD SUCCESS"),
         line: javaCompileLine,
       },
       npm: {
         command: "npm run build",
         target: "dist/index.js",
         success: "built",
-        done: `✓ built in ${formatRemaining(duration)}`,
+        done: logLine("info", `built in ${formatRemaining(duration)}`),
         line: npmCompileLine,
       },
       go: {
         command: "go build",
         target: "bin/app",
         success: "built",
-        done: "built bin/app",
+        done: logLine("info", "built bin/app"),
         line: goCompileLine,
       },
       rust: {
         command: "cargo build",
         target: "target/release/app",
         success: "Finished",
-        done: `Finished release [optimized] target(s) in ${formatRemaining(duration)}`,
+        done: logLine("info", `Finished release [optimized] target(s) in ${formatRemaining(duration)}`),
         line: rustCompileLine,
       },
       gcc: {
         command: "gcc -o app",
         target: "app",
         success: "built",
-        done: "built app",
+        done: logLine("info", "built app"),
         line: gccCompileLine,
       },
       dotnet: {
         command: "dotnet build",
         target: "bin/Release/app.dll",
         success: "Build succeeded",
-        done: "Build succeeded.",
+        done: logLine("info", "Build succeeded."),
         line: dotnetCompileLine,
       },
       python: {
         command: "python -m build",
         target: "dist/app.whl",
         success: "built",
-        done: "Successfully built app",
+        done: logLine("info", "Successfully built app"),
         line: pythonCompileLine,
       },
     };
@@ -680,12 +697,28 @@ function createPane(index) {
     const log = document.createElement("div");
     log.className = "compile-log";
     const logLines = [];
-    const pushCompileLine = (text) => {
+    const paintCompileLine = (node, entry) => {
+      const line = entry && typeof entry === "object" ? entry : { level: "info", message: String(entry) };
+      const marked = /^\[(INFO|DEBUG|WARN|ERROR)\]\s*/.exec(line.message);
+      const label = marked ? marked[0].trimEnd() : `[${String(line.level).toUpperCase()}]`;
+      const rest = marked ? line.message.slice(marked[0].length) : line.message;
+      const level = document.createElement("span");
+      level.className = `log-level is-${line.level}`;
+      level.textContent = label;
+      node.className = "compile-log-line";
+      node.replaceChildren(
+        document.createTextNode(`[${compileStamp()}] `),
+        level,
+        document.createTextNode(rest ? ` ${rest}` : "")
+      );
+    };
+    const pushCompileLine = (entry) => {
       if (!logLines.length) return;
       for (let index = 0; index < logLines.length - 1; index += 1) {
-        logLines[index].textContent = logLines[index + 1].textContent;
+        const next = logLines[index + 1];
+        logLines[index].replaceChildren(...[...next.childNodes].map((child) => child.cloneNode(true)));
       }
-      logLines[logLines.length - 1].textContent = `[${compileStamp()}] ${text}`;
+      paintCompileLine(logLines[logLines.length - 1], entry);
     };
     const fitCompileLog = () => {
       if (!panel.isConnected) return;
@@ -702,8 +735,7 @@ function createPane(index) {
       const count = Math.max(1, Math.floor((room + gap) / (lineHeight + gap)));
       while (logLines.length < count) {
         const line = document.createElement("div");
-        line.className = "compile-log-line";
-        line.textContent = `[${compileStamp()}] ${nextLine()}`;
+        paintCompileLine(line, nextLine());
         log.append(line);
         logLines.push(line);
       }
@@ -772,7 +804,7 @@ function createPane(index) {
         row.classList.add("is-stopped");
         status.textContent = "Stopped";
         title.textContent = "Stopped";
-        pushCompileLine("^C");
+        pushCompileLine(logLine("warn", "^C"));
         showCompileSummary("Stopped");
       },
     };
@@ -1083,13 +1115,13 @@ function createPane(index) {
     const FitAddon = globalThis.FitAddon?.FitAddon;
     term = new Terminal({
       cursorBlink: true,
-      fontFamily: '"Cascadia Mono", "DejaVu Sans Mono", ui-monospace, monospace',
+      fontFamily: '"Source Code Pro", ui-monospace, monospace',
       fontSize: 13,
       theme: {
-        background: "#10141c",
-        foreground: "#d7efe4",
+        background: "#000000",
+        foreground: "#e8e8e8",
         cursor: "#3dd68c",
-        selectionBackground: "#145246",
+        selectionBackground: "#333333",
       },
     });
     fitAddon = new FitAddon();
