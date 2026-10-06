@@ -1,0 +1,142 @@
+.compile {
+  display: grid;
+  gap: 8px;
+  margin: 6px 0;
+}
+
+.compile {
+  width: 100%;
+  min-width: 0;
+}
+
+.compile-live {
+  display: grid;
+  gap: 8px;
+  min-width: 0;
+}
+
+.compile-live[hidden] {
+  display: none;
+}
+
+.compile-title {
+  color: #d0d0d0;
+}
+
+.compile-item {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  column-gap: 12px;
+  row-gap: 4px;
+}
+
+.compile-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.compile-status {
+  color: #b5b5b5;
+}
+
+.compile-item {
+  width: 100%;
+  min-width: 0;
+}
+
+.compile-log {
+  grid-column: 1 / -1;
+  width: 100%;
+  min-width: 0;
+  display: grid;
+  align-content: start;
+  gap: 2px;
+  overflow: hidden;
+  color: #8a8a8a;
+  font-size: 12px;
+}
+
+.compile-log-line {
+  width: 100%;
+  height: 16px;
+  line-height: 16px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: #8a8a8a;
+}
+
+.log-level.is-info {
+  color: #4da3ff;
+}
+
+.log-level.is-debug {
+  color: #3dd68c;
+}
+
+.log-level.is-warn {
+  color: #f5d76e;
+}
+
+.log-level.is-error {
+  color: #ff5c5c;
+}
+
+.compile-summary {
+  display: grid;
+  gap: 2px;
+  width: 100%;
+  min-width: 0;
+  font-size: 12px;
+}
+
+.compile-summary-title {
+  margin-top: 2px;
+  color: #d0d0d0;
+}
+
+.compile-summary-row {
+  display: grid;
+  grid-template-columns: 7em minmax(0, 1fr);
+  gap: 12px;
+}
+
+.compile-summary-key {
+  color: #b5b5b5;
+}
+
+.compile-summary.is-done .compile-summary-result {
+  color: #3dd68c;
+}
+
+.compile-summary.is-stopped .compile-summary-result {
+  color: #777777;
+}
+
+.compile-item.is-done .compile-name,
+.compile-item.is-done .compile-status,
+.compile-item.is-done .compile-log {
+  color: #3dd68c;
+}
+
+.compile-item.is-stopped .compile-name,
+.compile-item.is-stopped .compile-status,
+.compile-item.is-stopped .compile-log {
+  color: #777777;
+}
+
+.compile-track {
+  grid-column: 1 / -1;
+  height: 8px;
+  border-radius: 99px;
+  background: #1a1a1a;
+  overflow: hidden;
+}
+
+.compile-bar {
+  width: 0;
+  height: 100%;
+  border-radius: inherit;
+  background: #3dd68c;
+}

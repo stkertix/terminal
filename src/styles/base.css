@@ -1,0 +1,50 @@
+* {
+  box-sizing: border-box;
+  scrollbar-width: thin;
+  scrollbar-color: #2a2a2a transparent;
+}
+
+*::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+
+*::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+*::-webkit-scrollbar-thumb {
+  background: #2a2a2a;
+  border: 2px solid transparent;
+  border-radius: 8px;
+  background-clip: padding-box;
+}
+
+*::-webkit-scrollbar-thumb:hover {
+  background: #d4d4d4;
+  border: 2px solid transparent;
+  background-clip: padding-box;
+}
+
+*::-webkit-scrollbar-corner {
+  background: transparent;
+}
+
+@font-face {
+  font-family: "Source Code Pro";
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url("../fonts/source-code-pro-latin-400-normal.woff2") format("woff2");
+}
+
+html,
+body {
+  margin: 0;
+  height: 100%;
+  background: #000000;
+  color: #e8e8e8;
+  font-family: "Source Code Pro", ui-monospace, monospace;
+  font-size: 13px;
+  line-height: 1.45;
+}

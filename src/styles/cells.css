@@ -1,0 +1,33 @@
+.monitor-cell.is-red,
+.monitor-plot-axis.is-red,
+.algorithm-cell.is-red,
+.play-cell.is-red { color: #ff4d4d; }
+.play-cell.is-red-dim { color: #6e3030; }
+.monitor-cell.is-orange,
+.monitor-plot-axis.is-orange,
+.algorithm-cell.is-orange,
+.play-cell.is-orange { color: #ff9a3c; }
+.play-cell.is-orange-dim { color: #6e4e24; }
+.monitor-cell.is-yellow,
+.monitor-plot-axis.is-yellow,
+.algorithm-cell.is-yellow,
+.play-cell.is-yellow { color: #f5d76e; }
+.play-cell.is-white { color: #f5f5f5; }
+.play-cell.is-line { color: #7dffb3; }
+.monitor-cell.is-green,
+.monitor-plot-axis.is-green,
+.algorithm-cell.is-green,
+.play-cell.is-green { color: #3dd68c; }
+.monitor-cell.is-blue,
+.monitor-plot-axis.is-blue,
+.algorithm-cell.is-blue,
+.play-cell.is-blue { color: #4da3ff; }
+.play-cell.is-blue-dim { color: #24537a; }
+.monitor-cell.is-indigo,
+.monitor-plot-axis.is-indigo,
+.algorithm-cell.is-indigo,
+.play-cell.is-indigo { color: #6d6dff; }
+.monitor-cell.is-purple,
+.monitor-plot-axis.is-purple,
+.algorithm-cell.is-purple,
+.play-cell.is-purple { color: #c084fc; }

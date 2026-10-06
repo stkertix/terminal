@@ -1,4 +1,4 @@
-import { TAROT_CARDS } from "./tarot-cards.js";
+import { TAROT_CARDS } from "./cards.js";
 
 const POSITIONS = ["Past", "Present", "Future"];
 

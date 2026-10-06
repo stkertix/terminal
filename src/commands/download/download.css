@@ -1,0 +1,78 @@
+.download {
+  display: grid;
+  gap: 8px;
+  margin: 6px 0;
+}
+
+.download {
+  max-width: 640px;
+}
+
+.download-title {
+  color: #d0d0d0;
+}
+
+.download-item {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  column-gap: 12px;
+  row-gap: 4px;
+}
+
+.download-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.download-status {
+  color: #b5b5b5;
+}
+
+.download-url,
+.download-log {
+  grid-column: 1 / -1;
+  overflow: hidden;
+  color: #8a8a8a;
+  font-size: 12px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.download-url {
+  color: #b5b5b5;
+}
+
+.download-item.is-queued .download-name,
+.download-item.is-queued .download-status {
+  color: #666666;
+}
+
+.download-item.is-done .download-name,
+.download-item.is-done .download-status,
+.download-item.is-done .download-url,
+.download-item.is-done .download-log {
+  color: #3dd68c;
+}
+
+.download-item.is-stopped .download-name,
+.download-item.is-stopped .download-status,
+.download-item.is-stopped .download-url,
+.download-item.is-stopped .download-log {
+  color: #777777;
+}
+
+.download-track {
+  grid-column: 1 / -1;
+  height: 8px;
+  border-radius: 99px;
+  background: #1a1a1a;
+  overflow: hidden;
+}
+
+.download-bar {
+  width: 0;
+  height: 100%;
+  border-radius: inherit;
+  background: #3dd68c;
+}

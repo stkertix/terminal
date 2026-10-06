@@ -1,0 +1,46 @@
+.play {
+  display: grid;
+  gap: 8px;
+  width: 100%;
+  min-width: 0;
+  margin: 6px 0 8px;
+  white-space: normal;
+  word-break: normal;
+}
+
+.play-view {
+  display: grid;
+  gap: 2px;
+}
+
+.play-view[hidden] {
+  display: none;
+}
+
+.play-stage {
+  position: relative;
+}
+
+.play-plot {
+  display: grid;
+}
+
+.play-summary-log {
+  margin-top: 8px;
+  color: #b5b5b5;
+  line-height: 1.45;
+  white-space: pre-wrap;
+}
+
+.play-row {
+  height: 14px;
+  line-height: 14px;
+  white-space: pre;
+}
+
+.play-cell {
+  display: inline-block;
+  width: 1ch;
+  text-align: center;
+  color: #8a8a8a;
+}

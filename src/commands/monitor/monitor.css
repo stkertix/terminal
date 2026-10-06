@@ -1,0 +1,49 @@
+.monitor {
+  display: grid;
+  gap: 8px;
+  width: 100%;
+  min-width: 0;
+  margin: 6px 0 8px;
+  white-space: normal;
+  word-break: normal;
+}
+
+.monitor-chart {
+  display: grid;
+  gap: 2px;
+}
+
+.monitor-chart[hidden] {
+  display: none;
+}
+
+.monitor-chart-title {
+  color: #b5b5b5;
+}
+
+.monitor-plot {
+  display: grid;
+}
+
+.monitor-plot-row {
+  display: grid;
+  grid-template-columns: 5ch minmax(0, max-content);
+  height: 14px;
+  line-height: 14px;
+  white-space: pre;
+}
+
+.monitor-plot-axis {
+  color: #8a8a8a;
+}
+
+.monitor-plot-marks {
+  color: #8a8a8a;
+  overflow: hidden;
+}
+
+.monitor-cell {
+  display: inline-block;
+  width: 1ch;
+  text-align: center;
+}
