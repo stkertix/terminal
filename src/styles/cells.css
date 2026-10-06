@@ -13,6 +13,7 @@
 .algorithm-cell.is-yellow,
 .play-cell.is-yellow { color: #f5d76e; }
 .play-cell.is-white { color: #f5f5f5; }
+.play-cell.is-gray { color: #9a9a9a; }
 .play-cell.is-line { color: #7dffb3; }
 .monitor-cell.is-green,
 .monitor-plot-axis.is-green,

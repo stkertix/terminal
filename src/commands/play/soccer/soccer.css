@@ -17,6 +17,8 @@
   align-items: end;
   gap: 12px;
   margin-top: 8px;
+  width: 0;
+  min-width: 100%;
 }
 
 .play-bottom .play-side.is-home { grid-column: 1; }
@@ -24,19 +26,26 @@
 .play-bottom .play-side.is-away { grid-column: 3; }
 
 .play-view.is-soccer .play-head {
-  display: flex;
-  justify-content: space-between;
-  align-items: flex-start;
-  gap: 12px;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+  align-items: start;
+  column-gap: 12px;
   width: 0;
   min-width: 100%;
 }
 
+.play-score { justify-self: start; }
+
+.play-note {
+  justify-self: center;
+  text-align: center;
+  color: #b5b5b5;
+}
+
 .play-clock-block {
-  margin-left: auto;
+  justify-self: end;
   text-align: right;
   line-height: 1.3;
-  flex: 0 0 auto;
 }
 
 .play-clock-time,
@@ -79,22 +88,30 @@
 
 .play-call {
   text-align: center;
-  white-space: nowrap;
-  font-size: 18px;
-  font-weight: 600;
-  line-height: 1.2;
+  white-space: normal;
+  max-width: 34ch;
+  justify-self: center;
+  align-self: end;
+  font-size: 15px;
+  font-weight: 500;
+  line-height: 1.35;
+  color: #d0d0d0;
 }
 
 .play-call[hidden] {
   display: none !important;
 }
 
-.play-call.is-goal { color: #f5d76e; }
-.play-call.is-game { color: #d7e4ff; }
+.play-call.is-goal { color: #f5d76e; font-weight: 600; }
+.play-call.is-home { color: #4da3ff; }
+.play-call.is-away { color: #ff4d4d; }
 .play-call.is-foul { color: #ff9a3c; }
 .play-call.is-corner { color: #d8ffe8; }
 .play-call.is-penalty { color: #ff4d4d; }
-.play-call.is-sub { color: #d8ffe8; }
+.play-call.is-sub,
+.play-call.is-kick { color: #d8ffe8; }
+.play-call.is-red { color: #ff4d4d; }
+.play-call.is-neutral { color: #c6c6c6; }
 
 .play-view.is-soccer .play-stage {
   width: max-content;
