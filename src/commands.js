@@ -1,4 +1,5 @@
 import { ALGORITHMS } from "./algorithms.js";
+import { GAMES } from "./games.js";
 
 const PROMPT = "user@host:~$";
 
@@ -37,6 +38,7 @@ const HELP = [
   `install   ${COMPILER_CHOICES} MINUTES LOOPS`,
   `monitor   [${CHARTS.join("|")}]`,
   `algorithm [${ALGORITHMS.join("|")}]`,
+  `play      [${GAMES.join("|")}]`,
   "top       Show the Chrome task manager",
   "htop      Show the Chrome task manager",
   "open      Open a page in this pane",
@@ -150,6 +152,15 @@ const HANDLERS = {
     }
     return { algorithm: name };
   },
+  play(args) {
+    if (args.length > 1) return `play: usage: play [${GAMES.join("|")}]`;
+    const name = args[0] || "soccer";
+    if (!GAMES.includes(name)) {
+      const list = GAMES.join(", ").replace(/, ([^,]*)$/, ", or $1");
+      return `play: ${args[0]}: expected ${list}`;
+    }
+    return { play: name };
+  },
   top(args) {
     if (args.length > 0) return "top: too many arguments";
     return { top: true };
@@ -210,6 +221,7 @@ export function execute(line, state, deps = {}) {
       compile: result.compile ?? null,
       monitor: typeof result.monitor === "string" ? result.monitor : null,
       algorithm: typeof result.algorithm === "string" ? result.algorithm : null,
+      play: typeof result.play === "string" ? result.play : null,
       top: Boolean(result.top),
     };
   }
