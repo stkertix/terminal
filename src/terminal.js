@@ -1584,18 +1584,57 @@ function createPane(index) {
     playFitObserver?.disconnect();
     playFitObserver = null;
     scrollback.classList.remove("is-play");
+    element.classList.remove("is-match");
   }
 
   function startPlay(name) {
     stopPlay();
+    scrollback.querySelectorAll(":scope > .output.play").forEach((node) => node.classList.remove("play"));
     const sim = createGame(name);
     const panel = document.createElement("div");
     panel.className = "output play";
     const view = document.createElement("div");
-    view.className = "play-view";
+    view.className = name === "soccer" ? "play-view is-soccer" : "play-view";
     const title = document.createElement("div");
     title.className = "play-title";
-    title.textContent = sim.title();
+    const homeMark = document.createElement("span");
+    homeMark.className = "play-team is-home";
+    homeMark.textContent = "HOME";
+    const scoreMark = document.createElement("span");
+    const awayMark = document.createElement("span");
+    awayMark.className = "play-team is-away";
+    awayMark.textContent = "AWAY";
+    const scoreLine = document.createElement("div");
+    scoreLine.className = "play-score";
+    const noteMark = document.createElement("span");
+    noteMark.className = "play-clock";
+    scoreLine.append(homeMark, scoreMark, awayMark, noteMark);
+    const clockBlock = document.createElement("div");
+    clockBlock.className = "play-clock-block";
+    const clockTime = document.createElement("div");
+    clockTime.className = "play-clock-time";
+    const clockPeriod = document.createElement("div");
+    clockPeriod.className = "play-period";
+    clockBlock.append(clockTime, clockPeriod);
+    if (name === "soccer") title.append(scoreLine, clockBlock);
+    else title.textContent = sim.title();
+    const makeSide = (place) => {
+      const card = document.createElement("div");
+      card.className = `play-side is-${place}`;
+      const playerName = document.createElement("div");
+      playerName.className = "play-side-name";
+      const role = document.createElement("div");
+      role.className = "play-side-role";
+      const track = document.createElement("div");
+      track.className = "play-stamina";
+      const bar = document.createElement("div");
+      bar.className = "play-stamina-bar";
+      track.append(bar);
+      card.append(playerName, role, track);
+      return card;
+    };
+    const homeCard = makeSide("home");
+    const awayCard = makeSide("away");
     const stage = document.createElement("div");
     stage.className = "play-stage";
     const plot = document.createElement("div");
@@ -1606,13 +1645,27 @@ function createPane(index) {
     const art = document.createElement("pre");
     art.className = "play-flash-art";
     flash.append(art);
-    stage.append(plot, flash);
+    const caption = document.createElement("div");
+    caption.className = "play-call";
+    caption.hidden = true;
+    const bottom = document.createElement("div");
+    bottom.className = "play-bottom";
+    bottom.append(homeCard, caption, awayCard);
+    const field = document.createElement("div");
+    field.className = "play-field";
+    if (name === "soccer") {
+      title.className = "play-head";
+      stage.append(plot);
+      field.append(title, stage, bottom);
+    } else stage.append(plot, flash);
     const history = document.createElement("div");
     history.className = "play-log";
-    view.append(title, stage, history);
+    if (name === "soccer") view.append(field, history);
+    else view.append(title, stage, history);
     panel.append(view);
     scrollback.insertBefore(panel, form);
     scrollback.classList.add("is-play");
+    if (name === "soccer") element.classList.add("is-match");
     const startedAt = performance.now();
     let closed = false;
     let gridRows = 0;
@@ -1637,11 +1690,45 @@ function createPane(index) {
       "is-red": 8,
       "is-matrix-head": 9,
     };
+    const paintSide = (card, player, team) => {
+      card.hidden = !player;
+      if (!player) return;
+      const playerName = card.querySelector(".play-side-name");
+      playerName.className = `play-side-name ${team}`;
+      playerName.textContent = player.name;
+      card.querySelector(".play-side-role").textContent = player.role;
+      const value = Math.max(0, Math.min(100, player.stamina));
+      const mix = (from, to) => Math.round(from + (to - from) * (value / 100));
+      const bar = card.querySelector(".play-stamina-bar");
+      bar.style.width = `${value}%`;
+      bar.style.background = `rgb(${mix(255, 61)}, ${mix(77, 214)}, ${mix(77, 140)})`;
+    };
+    const callText = (call) => {
+      if (!call) return "";
+      if (call.word === "GOAL") return `Goal  ${call.home} - ${call.away}`;
+      if (call.word === "CORNER") return "Corner";
+      if (call.word === "PENALTY") return "Penalty";
+      if (call.word === "FOUL") return "Foul";
+      if (call.word === "SUB") return "Sub";
+      return call.word;
+    };
     const paint = () => {
-      title.textContent = sim.title();
+      const board = name === "soccer" ? sim.hud() : null;
+      if (board) {
+        scoreMark.textContent = ` ${board.home} - ${board.away} `;
+        noteMark.textContent = board.note ? `  ${board.note}` : "";
+        clockTime.textContent = board.time;
+        clockPeriod.textContent = board.period;
+        paintSide(homeCard, board.homePlayer, "is-home");
+        paintSide(awayCard, board.awayPlayer, "is-away");
+      } else title.textContent = sim.title();
       const call = sim.highlight();
       const key = call ? `${call.word}:${call.home ?? ""}:${call.away ?? ""}:${gridCols}x${gridRows}` : "";
-      if (key !== flashKey) {
+      if (name === "soccer") {
+        caption.hidden = !call;
+        caption.textContent = callText(call);
+        caption.className = call ? `play-call is-${call.word.toLowerCase()}` : "play-call";
+      } else if (key !== flashKey) {
         flashKey = key;
         art.textContent = bannerArt(call, gridCols, gridRows);
         art.style.fontSize = "13px";
@@ -1659,10 +1746,34 @@ function createPane(index) {
           }
         }
       }
-      const lines = sim.events();
-      history.textContent = lines.slice(-5).join("\n");
+      if (name === "soccer") {
+        const capacity = Math.max(1, Math.floor((history.clientHeight || stage.clientHeight) / 14));
+        history.replaceChildren(...sim.feed().slice(-capacity).map((item) => {
+          const row = document.createElement("div");
+          if (item.divider) {
+            row.className = "play-log-line is-divider";
+            row.textContent = item.divider;
+            return row;
+          }
+          row.className = "play-log-line";
+          const time = document.createElement("span");
+          time.className = "play-log-time";
+          time.textContent = `${item.time} - `;
+          row.append(time);
+          item.parts.forEach((part) => {
+            const bit = document.createElement("span");
+            bit.className = `play-log-${part.tone}`;
+            bit.textContent = part.text;
+            row.append(bit);
+          });
+          return row;
+        }));
+      } else {
+        history.textContent = sim.events().slice(-5).join("\n");
+      }
       const cells = sim.cells();
       const dotCols = gridCols * 2;
+      const ballGlyph = (value) => value === "o" || value === "●";
       spans.forEach((span, index) => {
         const col = index % gridCols;
         const row = Math.floor(index / gridCols);
@@ -1675,7 +1786,7 @@ function createPane(index) {
           for (let dx = 0; dx < 2; dx += 1) {
             const dot = cells[(row * 4 + dy) * dotCols + col * 2 + dx];
             if (!dot) continue;
-            if (dot.glyph && (glyph !== "o" || dot.glyph === "o")) {
+            if (dot.glyph && (!ballGlyph(glyph) || ballGlyph(dot.glyph))) {
               glyph = dot.glyph;
               glyphTone = dot.tone;
             }
@@ -1699,7 +1810,7 @@ function createPane(index) {
       if (closed || !panel.isConnected) return;
       closed = true;
       stopPlay();
-      view.hidden = true;
+      view.remove();
       const summary = document.createElement("div");
       summary.className = `compile-summary ${result === "Stopped" ? "is-stopped" : "is-done"}`;
       const head = document.createElement("div");
@@ -1733,10 +1844,12 @@ function createPane(index) {
         matchLog.textContent = events.join("\n");
         summary.append(matchLog);
       }
+      panel.classList.remove("play");
       panel.append(summary);
       playJob = null;
       syncBusy();
       scrollToEnd();
+      saveState();
     };
     const rebuildPlot = () => {
       plot.replaceChildren();
@@ -1770,8 +1883,36 @@ function createPane(index) {
       plot.append(probe);
       const ch = probe.getBoundingClientRect().width || 8;
       probe.remove();
-      const cols = Math.max(24, Math.floor(roomW / ch));
-      const rows = Math.max(10, Math.floor(Math.max(14, roomH) / 14));
+      const field = sim.pitch?.();
+      let cols = Math.max(24, Math.floor(roomW / ch));
+      let rows = Math.max(10, Math.floor(Math.max(14, roomH) / 14));
+      if (field) {
+        const rowH = 14;
+        const logPx = 42 * ch + 16;
+        const maxW = Math.max(ch * 16, roomW - logPx);
+        const maxH = Math.max(rowH * 8, roomH);
+        const dotX = ch / 2;
+        const dotY = rowH / 4;
+        const colsFor = (pitchRows) => {
+          const dotH = pitchRows * 4 - 3;
+          const dotW = (field.length / field.width) * dotH * (dotY / dotX);
+          return Math.max(16, Math.round((dotW + 3) / 2));
+        };
+        rows = Math.max(8, Math.floor(maxH / rowH));
+        cols = colsFor(rows);
+        while (rows > 8 && cols * ch > maxW + 0.5) {
+          rows -= 1;
+          cols = colsFor(rows);
+        }
+        if (cols * ch > maxW + 0.5) {
+          cols = Math.max(16, Math.floor(maxW / ch));
+          const dotW = Math.max(8, cols * 2 - 3);
+          const dotH = dotW * (field.width / field.length) * (dotX / dotY);
+          rows = Math.max(8, Math.round((dotH + 3) / 4));
+          cols = colsFor(rows);
+          if (cols * ch > maxW + 0.5) cols = Math.max(16, Math.floor(maxW / ch));
+        }
+      }
       if (rows === gridRows && cols === gridCols && spans.length === rows * cols) return;
       gridRows = rows;
       gridCols = cols;
@@ -2199,9 +2340,13 @@ function createPane(index) {
     if (mode === "shell" || mode === "connecting") {
       return { history: [], lines: [], input: "", title: "user@host", browse: null, runtime: "shell" };
     }
-    const lines = [...scrollback.querySelectorAll(":scope > .row, :scope > .output")].map((node) => {
-      if (node.classList.contains("output")) return { type: "output", text: node.textContent };
-      return { type: "input", text: node.querySelector(".command")?.textContent ?? "" };
+    const lines = [...scrollback.querySelectorAll(":scope > .row, :scope > .output")].flatMap((node) => {
+      if (node.querySelector(".play-view")) return [];
+      if (node.classList.contains("output")) {
+        const text = node.querySelector(".compile-summary") ? node.innerText : node.textContent;
+        return [{ type: "output", text }];
+      }
+      return [{ type: "input", text: node.querySelector(".command")?.textContent ?? "" }];
     });
     const browsing = element.classList.contains("is-browsing");
     const src = frame.getAttribute("src");

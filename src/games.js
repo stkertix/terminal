@@ -12,7 +12,8 @@ const SIX_W = 18.32 / WIDTH;
 const SPOT = 11 / LENGTH;
 const CIRCLE_X = 9.15 / LENGTH;
 const CIRCLE_Y = 9.15 / WIDTH;
-const TICKS_PER_MATCH = 750;
+const TICKS_PER_MATCH = 2250;
+const CELEBRATE_TICKS = 84;
 const SHOT_SPEED = 0.11;
 const PASS_SPEED = 0.048;
 
@@ -26,13 +27,17 @@ const FORMATION = [
   { role: "mid", x: 0.34, y: 0.38 },
   { role: "mid", x: 0.34, y: 0.62 },
   { role: "mid", x: 0.38, y: 0.86 },
-  { role: "fwd", x: 0.56, y: 0.36 },
-  { role: "fwd", x: 0.56, y: 0.64 },
+  { role: "fwd", x: 0.44, y: 0.36 },
+  { role: "fwd", x: 0.44, y: 0.64 },
 ];
 
 const SPEED = { gk: 0.011, def: 0.015, mid: 0.016, fwd: 0.017 };
-const HOME_NAMES = ["NEUER", "LAHM", "RAMOS", "PUYOL", "ALBA", "XAVI", "INIESTA", "MODRIC", "KAKA", "MESSI", "SUAREZ"];
-const AWAY_NAMES = ["CASILLAS", "ALVES", "SILVA", "PIQUE", "MARCELO", "KROOS", "BUSQUETS", "GERRARD", "ZIDANE", "RONALDO", "HENRY"];
+const ROLE = { gk: "Keeper", def: "Defender", mid: "Midfielder", fwd: "Forward" };
+const HOME_NAMES = ["Neuer", "Lahm", "Ramos", "Puyol", "Alba", "Xavi", "Iniesta", "Modric", "Kaka", "Messi", "Suarez"];
+const AWAY_NAMES = ["Casillas", "Alves", "Silva", "Pique", "Marcelo", "Kroos", "Busquets", "Gerrard", "Zidane", "Ronaldo", "Henry"];
+const HOME_BENCH = ["Pirlo", "Ronaldinho", "Beckham", "Cannavaro", "Cafu"];
+const AWAY_BENCH = ["Nedved", "Seedorf", "Maldini", "Carlos", "Figo"];
+const SUBS_MAX = 3;
 
 function soccer() {
   let cols = 24;
@@ -52,10 +57,17 @@ function soccer() {
   let banner = "";
   let bannerLeft = 0;
   let flash = "";
+  let flashLeft = 0;
   let calm = 0;
   let celebrate = null;
+  let referee = null;
   let second = false;
   let halfBreak = null;
+  let oneTwo = null;
+  let made = { home: 0, away: 0 };
+  let bench = { home: [...HOME_BENCH], away: [...AWAY_BENCH] };
+  let subShow = null;
+  const subQueue = [];
   const log = [];
 
   const clamp = (value, min, max) => Math.min(max, Math.max(min, value));
@@ -65,18 +77,47 @@ function soccer() {
   const dirOf = (player) => (facesRight(player.side) ? 1 : -1);
 
   const bounds = () => {
-    const left = 1;
-    const right = Math.max(left + 2, cols - 2);
-    const top = 1;
-    const bottom = Math.max(top + 2, rows - 2);
-    return { left, right, top, bottom };
+    const marginX = 6;
+    const marginY = 8;
+    const availW = Math.max(4, cols - marginX * 2);
+    const availH = Math.max(4, rows - marginY * 2);
+    const ratio = cols / Math.max(1, rows);
+    let innerW = availW;
+    let innerH = innerW / ratio;
+    if (innerH > availH) {
+      innerH = availH;
+      innerW = innerH * ratio;
+    }
+    innerW = Math.max(4, Math.min(availW, innerW));
+    innerH = Math.max(4, Math.min(availH, innerH));
+    const left = Math.round((cols - innerW) / 2);
+    const top = Math.round((rows - innerH) / 2);
+    const right = Math.min(cols - 1, left + Math.round(innerW));
+    const bottom = Math.min(rows - 1, top + Math.round(innerH));
+    return { left, right: Math.max(left + 2, right), top, bottom: Math.max(top + 2, bottom) };
   };
 
   const pitchToCell = (x, y) => {
     const { left, right, top, bottom } = bounds();
     return {
-      col: clamp(Math.round(left + clamp(x, 0, 1) * (right - left)), 0, cols - 1),
-      row: clamp(Math.round(top + clamp(y, 0, 1) * (bottom - top)), 0, rows - 1),
+      col: clamp(Math.round(left + x * (right - left)), 0, cols - 1),
+      row: clamp(Math.round(top + y * (bottom - top)), 0, rows - 1),
+    };
+  };
+
+  const outsideSpot = (x, y) => {
+    const { left, right, top, bottom } = bounds();
+    let col = left + clamp(x, 0, 1) * (right - left);
+    let row = top + clamp(y, 0, 1) * (bottom - top);
+    if (x <= 0.05) col = Math.floor(left / 2) * 2 - 2;
+    else if (x >= 0.95) col = Math.floor(right / 2) * 2 + 2;
+    if (y <= 0.05) row = Math.floor(top / 4) * 4 - 4;
+    else if (y >= 0.95) row = Math.floor(bottom / 4) * 4 + 4;
+    col = clamp(Math.round(col), 0, cols - 1);
+    row = clamp(Math.round(row), 0, rows - 1);
+    return {
+      x: (col - left) / Math.max(1, right - left),
+      y: (row - top) / Math.max(1, bottom - top),
     };
   };
 
@@ -93,13 +134,13 @@ function soccer() {
   const hLine = (x0, x1, y) => {
     const from = pitchToCell(Math.min(x0, x1), y);
     const to = pitchToCell(Math.max(x0, x1), y);
-    for (let col = from.col; col <= to.col; col += 1) paint(col, from.row, "is-matrix-dim");
+    for (let col = from.col; col <= to.col; col += 1) paint(col, from.row, "is-line");
   };
 
   const vLine = (x, y0, y1) => {
     const from = pitchToCell(x, Math.min(y0, y1));
     const to = pitchToCell(x, Math.max(y0, y1));
-    for (let row = from.row; row <= to.row; row += 1) paint(from.col, row, "is-matrix-dim");
+    for (let row = from.row; row <= to.row; row += 1) paint(from.col, row, "is-line");
   };
 
   const drawBox = (xNear, xFar, y0, y1) => {
@@ -122,7 +163,7 @@ function soccer() {
         if (!outside) continue;
         const dist = Math.hypot((col - sx) / rx, (row - sy) / ry);
         if (Math.abs(dist - 1) > band) continue;
-        paint(col, row, "is-matrix-dim");
+        paint(col, row, "is-line");
       }
     }
   };
@@ -138,11 +179,11 @@ function soccer() {
     for (let row = top; row <= bottom; row += 1) {
       const mouth = row >= mouthTop && row <= mouthBot;
       if (mouth) {
-        paint(left - 1, row, "is-green");
-        paint(right + 1, row, "is-green");
+        paint(left - 1, row, "is-line");
+        paint(right + 1, row, "is-line");
       } else {
-        paint(left, row, "is-matrix-dim");
-        paint(right, row, "is-matrix-dim");
+        paint(left, row, "is-line");
+        paint(right, row, "is-line");
       }
     }
     vLine(0.5, 0, 1);
@@ -162,13 +203,13 @@ function soccer() {
     for (let row = top; row <= bottom; row += 1) {
       for (let col = left; col <= right; col += 1) {
         const dist = Math.hypot((col - cx) / rx, (row - cy) / ry);
-        if (Math.abs(dist - 1) <= band) paint(col, row, "is-matrix-dim");
+        if (Math.abs(dist - 1) <= band) paint(col, row, "is-line");
       }
     }
     drawArc(SPOT, "home");
     drawArc(1 - SPOT, "away");
     [pitchToCell(0.5, 0.5), pitchToCell(SPOT, 0.5), pitchToCell(1 - SPOT, 0.5)].forEach((spot) => {
-      paint(spot.col, spot.row, "is-green");
+      paint(spot.col, spot.row, "is-line");
     });
   };
 
@@ -177,9 +218,13 @@ function soccer() {
       player.px = player.x;
       player.py = player.y;
     });
-    if (!ball) return;
-    ball.px = ball.x;
-    ball.py = ball.y;
+    if (ball) {
+      ball.px = ball.x;
+      ball.py = ball.y;
+    }
+    if (!referee) return;
+    referee.px = referee.x;
+    referee.py = referee.y;
   };
 
   const spotOf = (entity, alpha) => {
@@ -209,87 +254,136 @@ function soccer() {
     };
     const ballSpot = spotOf(ball, alpha);
     let ballChar = charAt(ballSpot.x, ballSpot.y);
-    if (owner && !owner.out) {
-      const feet = charAt(spotOf(owner, alpha).x, spotOf(owner, alpha).y);
-      const below = feet.row + 2;
-      const above = feet.row - 2;
-      ballChar = { col: feet.col, row: below < charRows ? below : Math.max(0, above) };
-    }
     const taken = new Set();
-    const markOf = (player) => (player.role === "gk" ? "G" : player.side === "home" ? "H" : "A");
-    const cellsFor = (nameCol, nameRow, name) => {
+    const cellsFor = (nameCol, nameRow, name, card) => {
       const spots = [];
+      const mid = nameCol + Math.floor((name.length - 1) / 2);
+      if (card) spots.push([mid, nameRow - 1]);
       for (let index = 0; index < name.length; index += 1) spots.push([nameCol + index, nameRow]);
-      spots.push([nameCol + Math.floor((name.length - 1) / 2), nameRow + 1]);
+      spots.push([mid, nameRow + 1]);
       return spots;
     };
-    const freeAt = (nameCol, nameRow, name, gap) => {
-      const spots = cellsFor(nameCol, nameRow, name);
+    const freeAt = (nameCol, nameRow, name, gap, card, avoidBall) => {
+      const spots = cellsFor(nameCol, nameRow, name, card);
       return spots.every(([letterCol, letterRow]) => {
         if (letterRow < 0 || letterRow >= charRows || letterCol < 0 || letterCol >= charCols) return false;
-        if (Math.abs(letterCol - ballChar.col) <= gap && Math.abs(letterRow - ballChar.row) <= gap) return false;
+        if (avoidBall && Math.abs(letterCol - ballChar.col) <= gap && Math.abs(letterRow - ballChar.row) <= gap) return false;
         return !taken.has(`${letterCol},${letterRow}`)
           && !taken.has(`${letterCol - 1},${letterRow}`)
           && !taken.has(`${letterCol + 1},${letterRow}`);
       });
     };
-    const drawPlayer = (player) => {
-      const origin = charAt(spotOf(player, alpha).x, spotOf(player, alpha).y);
-      const name = player.name;
+    const drawFigure = (entity, name, tone, gap, card, avoidBall) => {
+      const origin = charAt(spotOf(entity, alpha).x, spotOf(entity, alpha).y);
+      const frame = bounds();
+      const pitchTop = Math.floor(frame.top / 4);
+      const pitchBottom = Math.floor(frame.bottom / 4);
+      const pitchLeft = Math.floor(frame.left / 2);
+      const pitchRight = Math.floor(frame.right / 2);
+      const markerInside = origin.col >= pitchLeft && origin.col <= pitchRight && origin.row >= pitchTop && origin.row <= pitchBottom;
+      const rowInside = (row) => !markerInside || (row >= pitchTop && row <= pitchBottom);
       let nameCol = origin.col - Math.floor((name.length - 1) / 2);
       let nameRow = origin.row - 1;
       if (nameCol < 0) nameCol = 0;
       if (nameCol + name.length > charCols) nameCol = Math.max(0, charCols - name.length);
-      if (nameRow < 0) nameRow = 0;
-      const gap = player === owner ? 1 : 0;
-      if (!freeAt(nameCol, nameRow, name, gap)) {
+      if (markerInside) {
+        if (nameCol < pitchLeft) nameCol = pitchLeft;
+        if (nameCol + name.length - 1 > pitchRight) nameCol = Math.max(pitchLeft, pitchRight - name.length + 1);
+      }
+      if (nameRow < 0) nameRow = card ? 1 : 0;
+      if (markerInside && nameRow < pitchTop) nameRow = pitchTop;
+      if (!rowInside(nameRow) || !freeAt(nameCol, nameRow, name, gap, card, avoidBall)) {
         let placed = false;
         for (let step = 1; step < charRows && !placed; step += 1) {
-          if (freeAt(nameCol, origin.row - 1 - step, name, gap)) {
+          if (rowInside(origin.row - 1 - step) && freeAt(nameCol, origin.row - 1 - step, name, gap, card, avoidBall)) {
             nameRow = origin.row - 1 - step;
             placed = true;
-          } else if (freeAt(nameCol, origin.row - 1 + step, name, gap)) {
+          } else if (rowInside(origin.row - 1 + step) && freeAt(nameCol, origin.row - 1 + step, name, gap, card, avoidBall)) {
             nameRow = origin.row - 1 + step;
             placed = true;
           }
         }
       }
-      const solid = player === owner;
-      const tone = player.yellows > 0
-        ? (solid ? "is-orange" : "is-orange-dim")
-        : player.side === "home"
-          ? (solid ? "is-blue" : "is-blue-dim")
-          : (solid ? "is-red" : "is-red-dim");
-      cellsFor(nameCol, nameRow, name).forEach(([letterCol, letterRow], index) => {
-        const glyph = index < name.length ? name[index] : markOf(player);
-        stamp(letterCol, letterRow, glyph, tone);
-        taken.add(`${letterCol},${letterRow}`);
+      let mark = null;
+      cellsFor(nameCol, nameRow, name, card).forEach(([letterCol, letterRow], index) => {
+        const letterIndex = card ? index - 1 : index;
+        const marker = letterIndex >= name.length;
+        const glyph = letterIndex < 0 ? "■" : marker ? "●" : name[letterIndex];
+        const spotCol = marker ? origin.col : letterCol;
+        const spotRow = marker ? origin.row : letterRow;
+        if (marker) mark = { col: spotCol, row: spotRow };
+        stamp(spotCol, spotRow, glyph, letterIndex < 0 ? "is-yellow" : tone);
+        taken.add(`${spotCol},${spotRow}`);
       });
+      return mark;
+    };
+    const drawPlayer = (player) => {
+      if (player.conceal) return null;
+      const solid = player === owner;
+      const tone = player.side === "home"
+        ? (solid ? "is-blue" : "is-blue-dim")
+        : (solid ? "is-red" : "is-red-dim");
+      return drawFigure(player, player.name, tone, 0, player.yellows > 0, player !== owner);
     };
     players.filter((player) => !player.out && player !== owner).forEach(drawPlayer);
-    if (owner && !owner.out) drawPlayer(owner);
-    stamp(ballChar.col, ballChar.row, "o", "is-yellow");
+    const carrier = owner && !owner.out ? drawPlayer(owner) : null;
+    if (carrier) {
+      const side = dirOf(owner) >= 0 ? 1 : -1;
+      const candidates = [side, -side].map((step) => ({ col: carrier.col + step, row: carrier.row }));
+      const spot = candidates.find((item) => (
+        item.col >= 0 && item.row >= 0 && item.col < charCols && item.row < charRows
+        && !taken.has(`${item.col},${item.row}`)
+      )) || candidates.find((item) => item.col >= 0 && item.col < charCols);
+      if (spot) ballChar = spot;
+    }
+    if (referee) drawFigure(referee, "Ref", "is-yellow", 1, false, true);
+    stamp(ballChar.col, ballChar.row, "●", "is-white");
   };
 
-  const stamp = () => {
-    const total = Math.max(0, Math.floor(clock * 60));
+  const clockText = () => {
+    const shown = Math.min(extra ? 120 : 90, Math.max(0, clock));
+    const total = Math.floor(shown * 60);
     const mm = String(Math.floor(total / 60)).padStart(2, "0");
     const ss = String(total % 60).padStart(2, "0");
     return `${mm}:${ss}`;
   };
 
-  const record = (text) => {
-    log.push(`${stamp()} - ${text}`);
+  const periodText = () => {
+    if (extra) {
+      const elapsed = Math.max(0, Math.min(30, clock - 90));
+      const total = Math.floor(elapsed * 60);
+      const mm = String(Math.floor(total / 60)).padStart(2, "0");
+      const ss = String(total % 60).padStart(2, "0");
+      return `Extra Time ${mm}:${ss}`;
+    }
+    return second ? "Second Half" : "First Half";
   };
 
-  const armBanner = (label, ticks) => {
+  const recordParts = (parts) => {
+    log.push({ time: clockText(), parts });
+  };
+
+  const record = (text, tone = "neutral") => {
+    recordParts([{ text, tone }]);
+  };
+
+  const markPeriod = (label) => {
+    if (log.some((item) => item.divider === label)) return;
+    log.push({ divider: label });
+  };
+
+  const restartDelay = () => Math.round((2000 + Math.random() * 1000) / 80);
+
+  const armBanner = (label, ticks, flashTicks = ticks) => {
     banner = label;
     bannerLeft = ticks;
-    if (label === "GOAL") flash = "GOAL";
-    else if (label === "CORNER") flash = "CORNER";
-    else if (label.includes("PENALTY")) flash = "PENALTY";
-    else if (label.includes("FREE KICK")) flash = "FOUL";
+    const key = label.toUpperCase();
+    if (key === "GOAL") flash = "GOAL";
+    else if (key === "CORNER") flash = "CORNER";
+    else if (key.includes("PENALTY")) flash = "PENALTY";
+    else if (key.includes("FREE KICK")) flash = "FOUL";
     else flash = "";
+    flashLeft = flash ? flashTicks : 0;
   };
 
   const show = (label) => {
@@ -298,7 +392,8 @@ function soccer() {
   };
 
   const kickoff = () => {
-    if (!players.length) {
+    const opening = !players.length;
+    if (opening) {
       players = [
         ...FORMATION.map((slot, index) => ({
           side: "home",
@@ -312,6 +407,7 @@ function soccer() {
           slotY: slot.y,
           passCool: 0,
           yellows: 0,
+          stamina: 100,
           out: false,
         })),
         ...FORMATION.map((slot, index) => ({
@@ -326,61 +422,82 @@ function soccer() {
           slotY: slot.y,
           passCool: 0,
           yellows: 0,
+          stamina: 100,
           out: false,
         })),
       ];
     } else {
+      substitute("home");
+      substitute("away");
       players.forEach((player) => {
         if (player.out) return;
-        player.x = player.slotX;
-        player.y = player.slotY;
         player.passCool = 0;
+        player.mark = { x: player.slotX, y: player.slotY };
       });
     }
     ball = { x: 0.5, y: 0.5, vx: 0, vy: 0, ignore: null, cool: 0, touch: kickSide };
+    if (!referee) referee = { x: 0.5, y: 0.72, px: 0.5, py: 0.72 };
     owner = null;
-    phase = null;
+    const wait = opening ? restartDelay() : 0;
+    phase = { kind: "kickoff", side: kickSide, wait, place: !opening, label: "Kick Off", ticks: 0 };
+    armBanner("Kick Off", opening ? wait : 120, 0);
     capture();
-    if (log.length === 0) record("KICK OFF");
+    if (log.length === 0) {
+      markPeriod("First Half");
+      const taker = nearest(ball, (player) => player.side === kickSide && player.role !== "gk");
+      const parts = [{ text: "Kick Off", tone: "kick" }];
+      if (taker) parts.push({ text: ` · ${taker.name}`, tone: taker.side });
+      recordParts(parts);
+    }
   };
 
   const score = (side) => {
     if (side === "home") homeScore += 1;
     else awayScore += 1;
-    record(side === "home" ? "HOME GOAL" : "AWAY GOAL");
     kickSide = side === "home" ? "away" : "home";
-    let scorer = ball.ignore;
+    const finisher = ball.ignore;
+    const own = Boolean(finisher && !finisher.out && finisher.side !== side);
+    let scorer = finisher;
     if (!scorer || scorer.out || scorer.side !== side || scorer.role === "gk") {
       scorer = nearest(ball, (player) => player.side === side && player.role !== "gk");
     }
+    const scorerName = (own ? finisher : scorer)?.name;
+    const scorerSide = (own ? finisher : scorer)?.side || side;
+    const parts = own
+      ? [{ text: "Own Goal", tone: "red" }]
+      : [{ text: side === "home" ? "Home" : "Away", tone: side }, { text: " Goal", tone: "goal" }];
+    if (scorerName) parts.push({ text: ` · ${scorerName}`, tone: scorerSide });
+    recordParts(parts);
     owner = null;
+    oneTwo = null;
     phase = null;
     ball.vx = 0;
     ball.vy = 0;
     celebrate = {
       side,
       scorer,
-      wait: 28,
+      wait: CELEBRATE_TICKS,
       x: facesRight(side) ? 0.92 : 0.08,
       y: ball.y < 0.5 ? 0.14 : 0.86,
     };
-    armBanner("GOAL", 30);
+    armBanner("GOAL", CELEBRATE_TICKS);
   };
 
   const endIfDue = () => {
     if (!extra && clock >= 90) {
       if (homeScore !== awayScore) {
         clock = 90;
-        record("FULL TIME");
+        record("Full Time");
         done = true;
         return true;
       }
       extra = true;
-      show("EXTRA TIME");
+      markPeriod("Extra Time");
+      armBanner("Extra Time", 18);
     }
     if (extra && clock >= 120) {
       clock = 120;
-      record("FULL TIME");
+      record("Full Time");
       done = true;
       return true;
     }
@@ -390,13 +507,16 @@ function soccer() {
   const beginHalf = () => {
     clock = 45;
     halfBreak = { wait: 18 };
-    show("HALF TIME");
+    show("Half Time");
   };
 
   const finishHalf = () => {
     halfBreak = null;
     second = true;
+    markPeriod("Second Half");
     kickSide = "away";
+    substitute("home");
+    substitute("away");
     players.forEach((player) => {
       player.slotX = facesRight(player.side) ? player.baseX : 1 - player.baseX;
       player.slotY = player.baseY;
@@ -460,6 +580,27 @@ function soccer() {
     entity.y += (dy / dist) * speed;
   };
 
+  const effort = (player, speed) => speed * (0.6 + 0.4 * ((player.stamina ?? 100) / 100));
+
+  const spend = (player, cost) => {
+    player.stamina = clamp((player.stamina ?? 100) + cost, 0, 100);
+  };
+
+  const moveReferee = () => {
+    if (!referee || !ball) return;
+    const dx = ball.x - referee.x;
+    const dy = ball.y - referee.y;
+    const dist = Math.hypot(dx, dy) || 1;
+    const keep = 0.16;
+    if (dist <= keep) return;
+    moveToward(
+      referee,
+      clamp(ball.x - (dx / dist) * keep, 0.08, 0.92),
+      clamp(ball.y - (dy / dist) * keep, 0.1, 0.9),
+      0.012,
+    );
+  };
+
   const anchor = (player) => {
     const attacking = Boolean(owner && owner.side === player.side);
     const dir = dirOf(player);
@@ -474,9 +615,109 @@ function soccer() {
     const slide = (ball.x - 0.5) * 0.16 * dir;
     let x = player.slotX + push * dir + slide;
     let y = player.slotY + (ball.y - 0.5) * 0.42;
-    if (player.role === "fwd" && attacking) x += 0.07 * dir;
+    if (attacking) {
+      const trail = player.role === "def" ? 0.12 : 0.05;
+      const squeeze = player.role === "def" ? 0.62 : 0.35;
+      return {
+        x: clamp(ball.x - dir * trail, 0.06, 0.94),
+        y: clamp(ball.y * (1 - squeeze) + player.slotY * squeeze, 0.14, 0.86),
+      };
+    }
     if (player.role === "def" && !attacking) x -= 0.03 * dir;
     return { x: clamp(x, 0.04, 0.96), y: clamp(y, 0.06, 0.94) };
+  };
+
+  const attackPack = () => {
+    if (!owner || owner.role === "gk") return [];
+    return players.filter((player) => (
+      !player.out
+      && player !== owner
+      && player.side === owner.side
+      && player.role !== "gk"
+      && player.role !== "def"
+    ));
+  };
+
+  const clusterSpot = (player, index, count) => {
+    const dir = dirOf(player);
+    const ahead = player.role === "fwd" ? 0.1 : 0.045;
+    const angle = (index / Math.max(1, count)) * Math.PI * 2;
+    return {
+      x: clamp(ball.x + dir * ahead + Math.cos(angle) * 0.065, 0.08, 0.92),
+      y: clamp(ball.y + Math.sin(angle) * 0.09, 0.16, 0.84),
+    };
+  };
+
+  const substitute = (side, avoid = null) => {
+    if (made[side] >= SUBS_MAX || !bench[side].length) return;
+    const held = new Set(subQueue.map((item) => item.player));
+    if (subShow) held.add(subShow.player);
+    const next = players
+      .filter((player) => !player.out && player.side === side && player.role !== "gk" && player !== avoid && !held.has(player))
+      .sort((a, b) => a.stamina - b.stamina)[0];
+    if (!next) return;
+    const chance = next.stamina < 40 ? 0.9 : next.stamina < 72 ? 0.45 : 0.12;
+    if (Math.random() > chance) return;
+    const name = bench[side].shift();
+    const old = next.name;
+    made[side] += 1;
+    subQueue.push({ player: next, name, side });
+    recordParts([
+      { text: "Sub", tone: "kick" },
+      { text: ` · ${name}`, tone: side },
+      { text: " On", tone: "neutral" },
+      { text: ` · ${old} Off`, tone: "neutral" },
+    ]);
+  };
+
+  const runSub = () => {
+    if (!subShow && !subQueue.length) return false;
+    capture();
+    if (!subShow) {
+      const job = subQueue.shift();
+      const gate = outsideSpot(0.5, 1);
+      subShow = {
+        player: job.player,
+        name: job.name,
+        x: job.player.x,
+        y: job.player.y,
+        phase: "off",
+        gateX: gate.x,
+        gateY: gate.y,
+      };
+    }
+    const player = subShow.player;
+    if (player.out) {
+      player.conceal = 0;
+      subShow = null;
+      return true;
+    }
+    if (subShow.phase === "off") {
+      moveToward(player, subShow.gateX, subShow.gateY, 0.02);
+      if (Math.hypot(player.x - subShow.gateX, player.y - subShow.gateY) <= 0.02) {
+        player.conceal = 8;
+        subShow.phase = "gap";
+      }
+    } else if (subShow.phase === "gap") {
+      player.conceal -= 1;
+      if (player.conceal <= 0) {
+        player.name = subShow.name;
+        player.stamina = 100;
+        player.yellows = 0;
+        player.conceal = 0;
+        player.x = subShow.gateX;
+        player.y = subShow.gateY;
+        subShow.phase = "on";
+      }
+    } else {
+      moveToward(player, subShow.x, subShow.y, 0.02);
+      if (Math.hypot(player.x - subShow.x, player.y - subShow.y) <= 0.02) {
+        player.x = subShow.x;
+        player.y = subShow.y;
+        subShow = null;
+      }
+    }
+    return true;
   };
 
   const pressers = () => {
@@ -497,7 +738,7 @@ function soccer() {
       ranked[0] = ranked[1];
       ranked[1] = swap;
     }
-    const picked = ranked.slice(0, owner ? 2 : 1);
+    const picked = ranked.slice(0, owner ? 3 : 1);
     if (!owner && picked[0]?.player.role === "gk") {
       const cover = ranked.find((item) => item.player.role !== "gk");
       if (cover) picked.push(cover);
@@ -543,7 +784,40 @@ function soccer() {
     return open[Math.floor(Math.random() * open.length)].mate;
   };
 
+  const tryOneTwo = (player) => {
+    if (oneTwo || player.passCool > 0 || Math.random() > 0.22) return false;
+    const dir = dirOf(player);
+    const marker = nearest(player, (other) => other.side !== player.side && other.role !== "gk");
+    if (!marker || Math.hypot(marker.x - player.x, marker.y - player.y) > 0.16) return false;
+    const partner = nearest(player, (other) => {
+      if (other.out || other.side !== player.side || other === player || other.role === "gk") return false;
+      const along = (other.x - player.x) * dir;
+      const across = Math.abs(other.y - player.y);
+      return along > -0.04 && along < 0.2 && across < 0.16 && Math.hypot(along, across) > 0.05;
+    });
+    if (!partner) return false;
+    oneTwo = { passer: player, partner, phase: "give", ticks: 16 };
+    recordParts([
+      { text: "One-Two", tone: "kick" },
+      { text: ` · ${player.name}`, tone: player.side },
+      { text: ` · ${partner.name}`, tone: partner.side },
+    ]);
+    launch(player, partner.x, partner.y, PASS_SPEED * 0.9);
+    return true;
+  };
+
   const decide = (player) => {
+    if (oneTwo && player === oneTwo.partner && oneTwo.phase === "give") {
+      const dir = dirOf(oneTwo.passer);
+      launch(
+        player,
+        clamp(oneTwo.passer.x + dir * 0.16, 0.06, 0.94),
+        clamp(oneTwo.passer.y, 0.12, 0.88),
+        PASS_SPEED,
+      );
+      oneTwo = null;
+      return;
+    }
     if (player.role === "gk") {
       launch(player, facesRight(player.side) ? 0.58 : 0.42, 0.16 + Math.random() * 0.68, PASS_SPEED);
       return;
@@ -555,6 +829,7 @@ function soccer() {
       whistle(marker, player);
       return;
     }
+    if (depth < 0.9 && tryOneTwo(player)) return;
     const closedDown = marker && markerDist < 0.04;
     if (depth >= 0.9 || (depth >= 0.74 && !closedDown)) {
       const keeper = nearest(player, (other) => other.role === "gk" && other.side !== player.side);
@@ -581,11 +856,15 @@ function soccer() {
     return ownsLeft(side) ? x <= BOX_D : x >= 1 - BOX_D;
   };
 
-  const beginSet = (kind, side, x, y, label) => {
+  const beginSet = (kind, side, x, y, label, parts) => {
     if (phase) return;
     owner = null;
-    ball.x = clamp(x, 0.02, 0.98);
-    ball.y = clamp(y, 0.03, 0.97);
+    const spot = kind === "throw" || kind === "corner" ? outsideSpot(x, y) : {
+      x: clamp(x, 0.02, 0.98),
+      y: clamp(y, 0.03, 0.97),
+    };
+    ball.x = spot.x;
+    ball.y = spot.y;
     ball.vx = 0;
     ball.vy = 0;
     ball.cool = 0;
@@ -593,15 +872,151 @@ function soccer() {
     ball.touch = side;
     ball.px = ball.x;
     ball.py = ball.y;
-    phase = { kind, side, wait: 12 };
-    calm = 70;
-    show(label);
+    const delayed = kind === "free" || kind === "penalty" || kind === "corner" || kind === "throw";
+    const wait = delayed ? 0 : 12;
+    phase = { kind, side, wait, place: delayed, label, ticks: 0 };
+    calm = 90;
+    const taker = kind === "goal"
+      ? players.find((player) => player.side === side && player.role === "gk" && !player.out)
+      : nearest(ball, (player) => player.side === side && player.role !== "gk")
+        || nearest(ball, (player) => player.side === side);
+    if (taker && !delayed) {
+      taker.x = ball.x;
+      taker.y = ball.y;
+    }
+    if (taker && delayed) taker.mark = { x: ball.x, y: ball.y };
+    if (delayed) armBanner(label, 120, 0);
+    else armBanner(label, 18);
+    if (!parts) {
+      const tone = kind === "corner" ? "corner" : kind === "throw" || kind === "goal" ? "kick" : "neutral";
+      parts = [{ text: label, tone }];
+      if (taker) parts.push({ text: ` · ${taker.name}`, tone: taker.side });
+    }
+    recordParts(parts);
+    oneTwo = null;
+    if (kind === "free") placeWall(side);
+    if (kind === "corner") placeCornerCrowd(side, taker);
+    if (kind === "penalty") placePenalty(side, taker);
+    if (kind === "throw") placeThrow(side, taker);
+    if (kind === "throw" || kind === "goal") {
+      substitute(side, taker);
+      substitute(side === "home" ? "away" : "home");
+    }
+  };
+
+  const placeWall = (attackSide) => {
+    const defending = attackSide === "home" ? "away" : "home";
+    const goalX = facesRight(attackSide) ? 1 : 0;
+    const dx = goalX - ball.x;
+    const dy = 0.5 - ball.y;
+    const dist = Math.hypot(dx, dy) || 1;
+    const gap = 9.15 / LENGTH;
+    const cx = ball.x + (dx / dist) * gap;
+    const cy = ball.y + (dy / dist) * gap;
+    const px = -dy / dist;
+    const py = dx / dist;
+    const wall = players
+      .filter((player) => !player.out && player.side === defending && player.role !== "gk")
+      .sort((a, b) => Math.hypot(a.x - cx, a.y - cy) - Math.hypot(b.x - cx, b.y - cy))
+      .slice(0, 4);
+    wall.forEach((player, index) => {
+      const offset = (index - (wall.length - 1) / 2) * 0.09;
+      player.mark = {
+        x: clamp(cx + px * offset, 0.06, 0.94),
+        y: clamp(cy + py * offset, 0.1, 0.9),
+      };
+    });
+    const keeper = players.find((player) => player.side === defending && player.role === "gk" && !player.out);
+    if (keeper) keeper.mark = { x: facesRight(attackSide) ? 0.97 : 0.03, y: 0.5 };
+    players.forEach((player) => {
+      if (player.out || player.mark || player.role === "gk") return;
+      if (player.side === attackSide) {
+        player.mark = {
+          x: clamp(ball.x - ((goalX - ball.x) / dist) * 0.08, 0.06, 0.94),
+          y: clamp(player.y, 0.12, 0.88),
+        };
+        return;
+      }
+      player.mark = {
+        x: clamp(player.x + ((goalX - player.x) * 0.25), 0.06, 0.94),
+        y: clamp(player.y, 0.1, 0.9),
+      };
+    });
+  };
+
+  const placeCornerCrowd = (attackSide, taker) => {
+    const defending = attackSide === "home" ? "away" : "home";
+    const forward = facesRight(attackSide);
+    const attackers = players.filter((player) => !player.out && player.side === attackSide && player !== taker && player.role !== "gk");
+    const markers = players.filter((player) => !player.out && player.side === defending && player.role !== "gk");
+    const slots = [
+      [0.05, -0.22], [0.09, -0.16], [0.13, -0.1], [0.06, -0.04],
+      [0.1, 0.04], [0.14, 0.1], [0.07, 0.16], [0.11, 0.22], [0.15, 0], [0.12, -0.22],
+    ];
+    attackers.forEach((player, index) => {
+      const [depth, wide] = slots[index % slots.length];
+      player.mark = {
+        x: clamp(forward ? 1 - depth : depth, 0.04, 0.96),
+        y: clamp(0.5 + wide, 0.22, 0.78),
+      };
+    });
+    markers.forEach((player, index) => {
+      const mate = attackers[index % Math.max(1, attackers.length)];
+      if (!mate?.mark) return;
+      player.mark = {
+        x: clamp(mate.mark.x + (forward ? 0.04 : -0.04), 0.04, 0.96),
+        y: clamp(mate.mark.y + (index % 2 === 0 ? 0.055 : -0.055), 0.16, 0.84),
+      };
+    });
+    const keeper = players.find((player) => player.side === defending && player.role === "gk" && !player.out);
+    if (keeper) keeper.mark = { x: forward ? 0.97 : 0.03, y: 0.46 };
+  };
+
+  const placePenalty = (attackSide, taker) => {
+    const defending = attackSide === "home" ? "away" : "home";
+    const forward = facesRight(attackSide);
+    const line = forward ? 1 - BOX_D - 0.04 : BOX_D + 0.04;
+    const keeper = players.find((player) => player.side === defending && player.role === "gk" && !player.out);
+    if (taker) taker.mark = { x: ball.x, y: ball.y };
+    if (keeper) keeper.mark = { x: forward ? 0.97 : 0.03, y: 0.5 };
+    const rest = players.filter((player) => !player.out && player !== taker && player !== keeper);
+    rest.forEach((player, index) => {
+      const row = index - (rest.length - 1) / 2;
+      const drop = player.side === attackSide ? (forward ? -0.05 : 0.05) : (forward ? 0.02 : -0.02);
+      player.mark = {
+        x: clamp(line + drop, 0.05, 0.95),
+        y: clamp(0.5 + row * 0.045, 0.08, 0.92),
+      };
+    });
+  };
+
+  const placeThrow = (side, taker) => {
+    if (taker) taker.mark = { x: ball.x, y: ball.y };
+    const inside = ball.y < 0.5 ? 0.18 : 0.82;
+    const nearestToBall = (team) => players
+      .filter((player) => !player.out && player.side === team && player !== taker && player.role !== "gk")
+      .sort((a, b) => Math.hypot(a.x - ball.x, a.y - ball.y) - Math.hypot(b.x - ball.x, b.y - ball.y));
+    const mates = nearestToBall(side).slice(0, 3);
+    mates.forEach((player, index) => {
+      player.mark = {
+        x: clamp(ball.x + (index - 1) * 0.08, 0.08, 0.92),
+        y: inside,
+      };
+    });
+    nearestToBall(side === "home" ? "away" : "home").slice(0, 3).forEach((player, index) => {
+      const mate = mates[index];
+      if (!mate?.mark) return;
+      player.mark = {
+        x: mate.mark.x,
+        y: clamp(mate.mark.y + (ball.y < 0.5 ? 0.1 : -0.1), 0.14, 0.86),
+      };
+    });
   };
 
   const takeSet = () => {
     const piece = phase;
     phase = null;
-    if (!piece) return;
+    if (!piece || piece.kind === "kickoff") return;
     const attackingGoal = facesRight(piece.side) ? 1.06 : -0.06;
     const spotX = facesRight(piece.side) ? 1 - SPOT : SPOT;
     let kicker = piece.kind === "goal"
@@ -624,6 +1039,11 @@ function soccer() {
       launch(kicker, spotX, 0.5 + (Math.random() - 0.5) * 0.22, PASS_SPEED);
       return;
     }
+    if (piece.kind === "throw") {
+      const mate = nearest(ball, (player) => player.side === piece.side && player !== kicker && player.role !== "gk");
+      launch(kicker, mate ? clamp(mate.x, 0.08, 0.92) : 0.5, mate ? clamp(mate.y, 0.2, 0.8) : 0.5, PASS_SPEED);
+      return;
+    }
     if (piece.kind === "goal") {
       launch(kicker, 0.5, 0.28 + Math.random() * 0.44, PASS_SPEED);
       return;
@@ -639,24 +1059,33 @@ function soccer() {
     const spotX = clamp(victim.x, 0.05, 0.95);
     const spotY = clamp(victim.y, 0.08, 0.92);
     const roll = Math.random();
-    let card = "FOUL";
+    let card = "Foul";
     if (offender.yellows > 0 && roll < 0.4) {
       offender.out = true;
-      card = "2ND YELLOW";
+      card = "2nd Yellow";
     } else if (roll < 0.05) {
       offender.out = true;
-      card = "RED";
+      card = "Red";
     } else if (roll < 0.42 && offender.yellows === 0) {
       offender.yellows += 1;
-      card = "YELLOW";
+      card = "Yellow";
     }
     const attack = offender.side === "home" ? "away" : "home";
-    if (inOwnBox(offender.side, spotX, spotY)) {
+    const cardTone = card === "Red" ? "red" : card === "Foul" ? "foul" : "yellow";
+    const inBox = inOwnBox(offender.side, spotX, spotY);
+    const restart = inBox ? "Penalty" : "Free Kick";
+    const parts = [
+      { text: offender.name, tone: offender.side },
+      { text: ` · ${card}`, tone: cardTone },
+      { text: ` · ${restart}`, tone: inBox ? "penalty" : "foul" },
+    ];
+    const label = parts.map((part) => part.text).join("");
+    if (inBox) {
       const spot = ownsLeft(offender.side) ? SPOT : 1 - SPOT;
-      beginSet("penalty", attack, spot, 0.5, `${card} · PENALTY`);
+      beginSet("penalty", attack, spot, 0.5, label, parts);
       return;
     }
-    beginSet("free", attack, spotX, spotY, `${card} · FREE KICK`);
+    beginSet("free", attack, spotX, spotY, label, parts);
   };
 
   const tackle = () => {
@@ -676,6 +1105,7 @@ function soccer() {
       bestDist = dist;
     });
     if (!best) return false;
+    if (oneTwo && best !== oneTwo.partner) oneTwo = null;
     if (calm <= 0 && Math.random() < 0.3) {
       whistle(best, owner);
       return true;
@@ -699,9 +1129,9 @@ function soccer() {
       if (player.out || (ball.cool > 0 && player === ball.ignore)) return;
       if (player.role === "gk" && pace > PASS_SPEED && keeperReaches(player) && Math.random() < 0.45) {
         const attack = player.side === "home" ? "away" : "home";
-        const x = ownsLeft(player.side) ? 0.03 : 0.97;
-        const y = ball.y < 0.5 ? 0.04 : 0.96;
-        beginSet("corner", attack, x, y, "CORNER");
+        const x = ownsLeft(player.side) ? 0 : 1;
+        const y = ball.y < 0.5 ? 0 : 1;
+        beginSet("corner", attack, x, y, "Corner");
         best = player;
         bestDist = -1;
         return;
@@ -719,6 +1149,7 @@ function soccer() {
     });
     if (!best) return false;
     if (phase) return true;
+    if (oneTwo && best !== oneTwo.partner && best !== oneTwo.passer) oneTwo = null;
     owner = best;
     best.passCool = 6;
     ball.vx = 0;
@@ -732,9 +1163,13 @@ function soccer() {
     const pace = Math.hypot(ball.vx, ball.vy);
     const slices = pace > PASS_SPEED ? 4 : 1;
     for (let slice = 0; slice < slices; slice += 1) {
+      const fromX = ball.x;
+      const fromY = ball.y;
       ball.x += ball.vx / slices;
       ball.y += ball.vy / slices;
-      if (ball.x < 0 || ball.x > 1) {
+      const crossedOutX = fromX >= 0 && fromX <= 1 && (ball.x < 0 || ball.x > 1);
+      const crossedOutY = fromY >= 0 && fromY <= 1 && (ball.y < 0 || ball.y > 1);
+      if (crossedOutX) {
         const leftSide = ownsLeft("home") ? "home" : "away";
         const scored = ball.x < 0 ? (leftSide === "home" ? "away" : "home") : leftSide;
         if (inGoalY(ball.y)) {
@@ -743,14 +1178,14 @@ function soccer() {
         }
         const defending = ball.x < 0 ? leftSide : (leftSide === "home" ? "away" : "home");
         const attacking = defending === "home" ? "away" : "home";
-        const y = ball.y < 0.5 ? 0.04 : 0.96;
-        if (ball.touch === defending) beginSet("corner", attacking, ball.x < 0 ? 0.03 : 0.97, y, "CORNER");
-        else beginSet("goal", defending, ownsLeft(defending) ? 0.08 : 0.92, 0.5, "GOAL KICK");
+        if (ball.touch === defending) beginSet("corner", attacking, ball.x < 0 ? 0 : 1, ball.y < 0.5 ? 0 : 1, "Corner");
+        else beginSet("goal", defending, ownsLeft(defending) ? 0.08 : 0.92, 0.5, "Goal Kick");
         return;
       }
-      if (ball.y < 0 || ball.y > 1) {
-        ball.y = clamp(ball.y, 0.02, 0.98);
-        ball.vy = 0;
+      if (crossedOutY) {
+        const side = ball.touch === "home" ? "away" : "home";
+        beginSet("throw", side, clamp(ball.x, 0.08, 0.92), ball.y < 0.5 ? 0 : 1, "Throw In");
+        return;
       }
       if (claimLoose(pace)) return;
     }
@@ -774,14 +1209,18 @@ function soccer() {
     },
     step() {
       if (done) return;
+      if (runSub()) {
+        render();
+        return;
+      }
       capture();
       clock += 90 / TICKS_PER_MATCH;
       if (calm > 0) calm -= 1;
+      moveReferee();
       if (bannerLeft > 0) bannerLeft -= 1;
-      if (bannerLeft <= 0) {
-        banner = "";
-        flash = "";
-      }
+      if (bannerLeft <= 0) banner = "";
+      if (flashLeft > 0) flashLeft -= 1;
+      if (flashLeft <= 0) flash = "";
       if (celebrate) {
         celebrate.wait -= 1;
         celebrateMove();
@@ -810,48 +1249,96 @@ function soccer() {
       if (!extra && clock >= 90) {
         if (homeScore !== awayScore) {
           clock = 90;
-          record("FULL TIME");
+          record("Full Time");
           done = true;
           render();
           return;
         }
         extra = true;
-        if (!banner) show("EXTRA TIME");
+        markPeriod("Extra Time");
+        if (!banner) armBanner("Extra Time", 18);
       }
       if (extra && clock >= 120) {
         clock = 120;
-        record("FULL TIME");
+        record("Full Time");
         done = true;
         render();
         return;
       }
       if (phase) {
+        if (phase.place) {
+          phase.ticks += 1;
+          let pending = false;
+          players.forEach((player) => {
+            if (player.out || !player.mark) return;
+            const left = Math.hypot(player.x - player.mark.x, player.y - player.mark.y);
+            if (left > 0.03 && phase.ticks < 60) {
+              pending = true;
+              moveToward(player, player.mark.x, player.mark.y, 0.03);
+              return;
+            }
+            player.x = player.mark.x;
+            player.y = player.mark.y;
+          });
+          if (!pending) {
+            players.forEach((player) => { player.mark = null; });
+            phase.place = false;
+            phase.wait = restartDelay();
+            armBanner(phase.label, phase.wait, phase.kind === "kickoff" ? 0 : 12);
+          }
+          render();
+          return;
+        }
         phase.wait -= 1;
         if (phase.wait <= 0) takeSet();
         render();
         return;
       }
+      if (oneTwo && (oneTwo.ticks -= 1) <= 0) oneTwo = null;
       const chasing = new Set(pressers());
+      const pack = attackPack();
+      const packed = new Set(pack);
       const helper = support();
       players.forEach((player) => {
         if (player.out) return;
+        if (oneTwo && player === oneTwo.passer && player !== owner) {
+          const dir = dirOf(player);
+          spend(player, -0.35);
+          moveToward(
+            player,
+            clamp(oneTwo.partner.x + dir * 0.18, 0.06, 0.94),
+            clamp(oneTwo.partner.y, 0.12, 0.88),
+            effort(player, 0.021),
+          );
+          return;
+        }
+        if (packed.has(player)) {
+          const spot = clusterSpot(player, pack.indexOf(player), pack.length);
+          spend(player, -0.2);
+          moveToward(player, spot.x, spot.y, effort(player, SPEED[player.role] + 0.005));
+          return;
+        }
         if (player === owner) {
           if (player.role === "gk") return;
+          spend(player, -0.45);
           const aimY = clamp(player.y + (0.5 - player.y) * 0.08 + (player.y < 0.5 ? -0.04 : 0.04), 0.16, 0.84);
-          moveToward(player, clamp(player.x + dirOf(player) * 0.18, 0.04, 0.96), aimY, 0.018);
+          moveToward(player, clamp(player.x + dirOf(player) * 0.18, 0.04, 0.96), aimY, effort(player, 0.018));
           return;
         }
         if (chasing.has(player)) {
-          moveToward(player, ball.x, ball.y, player.role === "gk" ? SPEED.gk : 0.017);
+          spend(player, player.role === "gk" ? -0.12 : -0.4);
+          moveToward(player, ball.x, ball.y, effort(player, player.role === "gk" ? SPEED.gk : 0.017));
           return;
         }
         if (player === helper) {
+          spend(player, -0.15);
           const dir = dirOf(owner);
-          moveToward(player, clamp(owner.x - dir * 0.1, 0.08, 0.92), clamp(owner.y + (owner.y < 0.5 ? 0.12 : -0.12), 0.1, 0.9), SPEED[player.role]);
+          moveToward(player, clamp(owner.x - dir * 0.1, 0.08, 0.92), clamp(owner.y + (owner.y < 0.5 ? 0.12 : -0.12), 0.1, 0.9), effort(player, SPEED[player.role]));
           return;
         }
+        spend(player, 0.22);
         const spot = anchor(player);
-        moveToward(player, spot.x, spot.y, SPEED[player.role]);
+        moveToward(player, spot.x, spot.y, effort(player, SPEED[player.role]));
       });
       if (owner) {
         ball.x = owner.x;
@@ -868,18 +1355,52 @@ function soccer() {
       return cells;
     },
     events() {
+      return log.map((item) => (
+        item.divider
+          ? `—— ${item.divider} ——`
+          : `${item.time} - ${item.parts.map((part) => part.text).join("")}`
+      ));
+    },
+    feed() {
       return log;
     },
     highlight() {
+      if (subShow) return { word: "SUB" };
       if (!flash) return null;
       if (flash !== "GOAL") return { word: flash };
       return { word: "GOAL", home: homeScore, away: awayScore };
     },
-    title() {
+    pitch() {
+      return { length: LENGTH, width: WIDTH };
+    },
+    hud() {
       const minute = Math.min(extra ? 120 : 90, Math.floor(clock));
-      const mark = extra ? " ET" : "";
+      const card = (side) => {
+        const player = owner && !owner.out && owner.side === side
+          ? owner
+          : nearest(ball, (item) => item.side === side && !item.out);
+        if (!player) return null;
+        return {
+          name: player.name,
+          role: ROLE[player.role] || player.role,
+          stamina: Math.round(player.stamina ?? 100),
+        };
+      };
+      return {
+        home: homeScore,
+        away: awayScore,
+        minute,
+        time: clockText(),
+        period: periodText(),
+        extra,
+        note: subShow ? "Sub" : banner,
+        homePlayer: card("home"),
+        awayPlayer: card("away"),
+      };
+    },
+    title() {
       const note = banner ? `  ${banner}` : "";
-      return `soccer  HOME ${homeScore} - ${awayScore} AWAY  ${minute}'${mark}${note}`;
+      return `soccer  HOME ${homeScore} - ${awayScore} AWAY  ${clockText()}  ${periodText()}${note}`;
     },
     score() {
       const homeN = players.filter((player) => player.side === "home" && !player.out).length;
