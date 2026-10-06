@@ -1,5 +1,5 @@
 import { formatRemaining, compileStamp } from "../../format.js";
-import { soccer } from "./soccer.js";
+import { soccer, soccerReplay } from "./soccer.js";
 
 const BRAILLE_BIT = [
   [0x01, 0x08],
@@ -74,10 +74,54 @@ export function createSoccerView(env) {
     env.element.classList.remove("is-match");
   }
 
-  function start() {
+  function showReplay(command) {
+    const tape = soccerReplay();
+    const panel = document.createElement("div");
+    panel.className = "output";
+    const summary = document.createElement("div");
+    summary.className = "compile-summary is-done";
+    const head = document.createElement("div");
+    head.className = "compile-summary-title";
+    head.textContent = "Summary";
+    summary.append(head);
+    const rows = tape
+      ? [["Result", "Replay"], ["Command", command], ["Score", tape.score], ...tape.rows]
+      : [["Result", "No match to replay"], ["Command", command]];
+    rows.forEach(([label, value]) => {
+      if (!value) return;
+      const line = document.createElement("div");
+      line.className = "compile-summary-row";
+      const key = document.createElement("span");
+      key.className = "compile-summary-key";
+      key.textContent = label;
+      const item = document.createElement("span");
+      item.className = label === "Result" ? "compile-summary-result" : "compile-summary-value";
+      item.textContent = value;
+      line.append(key, item);
+      summary.append(line);
+    });
+    if (tape?.events?.length) {
+      const log = document.createElement("div");
+      log.className = "play-summary-log";
+      log.textContent = tape.events.join("\n");
+      summary.append(log);
+    }
+    panel.append(summary);
+    env.scrollback.insertBefore(panel, env.form);
+    env.scrollToEnd();
+  }
+
+  function start(options) {
+    const opts = options || {};
     stop();
+    if (opts.replay) {
+      showReplay(opts.command || "play soccer replay");
+      return;
+    }
     env.scrollback.querySelectorAll(":scope > .output.play").forEach((node) => node.classList.remove("play"));
-    const sim = soccer();
+    const sim = soccer({ seed: opts.seed });
+    const command = opts.command || "play soccer";
+    const pace = opts.speed === 2 ? 2 : 1;
     const panel = document.createElement("div");
     panel.className = "output play";
     const view = document.createElement("div");
@@ -226,11 +270,12 @@ export function createSoccerView(env) {
       summary.append(head);
       [
         ["Result", result],
-        ["Command", "play soccer"],
+        ["Command", command],
         ["Score", sim.score()],
         ["Size", gridCols && gridRows ? `${gridCols} × ${gridRows}` : ""],
         ["Time", formatRemaining(performance.now() - startedAt)],
         ["Finished", compileStamp()],
+        ...sim.summary(),
       ].forEach(([label, value]) => {
         if (!value) return;
         const line = document.createElement("div");
@@ -329,6 +374,13 @@ export function createSoccerView(env) {
     };
     env.syncBusy();
     fit();
+    if (opts.skip) {
+      let guard = 0;
+      while (!sim.holding && !sim.done && guard < 40000) {
+        sim.step();
+        guard += 1;
+      }
+    }
     playFitObserver = new ResizeObserver(() => fit());
     playFitObserver.observe(env.scrollback);
     const tickMs = 80;
@@ -349,7 +401,10 @@ export function createSoccerView(env) {
       lastFrame = now;
       let steps = 0;
       while (pending >= tickMs && steps < 4) {
-        sim.step();
+        for (let extra = 0; extra < pace; extra += 1) {
+          if (sim.done) break;
+          sim.step();
+        }
         pending -= tickMs;
         steps += 1;
         if (sim.done || sim.holding) break;

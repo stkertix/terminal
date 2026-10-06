@@ -63,6 +63,7 @@ export function execute(line, state, deps = {}) {
       monitor: typeof result.monitor === "string" ? result.monitor : null,
       algorithm: typeof result.algorithm === "string" ? result.algorithm : null,
       play: typeof result.play === "string" ? result.play : null,
+      playOptions: result.playOptions ?? null,
       top: Boolean(result.top),
     };
   }

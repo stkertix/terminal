@@ -9,12 +9,12 @@ export function createPlayView(env) {
   let active = null;
 
   return {
-    start(name) {
+    start(name, options) {
       const next = games[name];
       if (!next) throw new Error(`Unknown game: ${name}`);
       if (active && active !== next) active.stop();
       active = next;
-      active.start();
+      active.start(options);
     },
     stop() {
       active?.stop();

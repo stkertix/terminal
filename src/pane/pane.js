@@ -255,7 +255,7 @@ export function createPane(index) {
     if (result.top) tasks.start();
     else if (result.monitor) monitor.start(result.monitor);
     else if (result.algorithm) algorithm.start(result.algorithm);
-    else if (result.play) play.start(result.play);
+    else if (result.play) play.start(result.play, result.playOptions);
     else if (result.download) download.start(result.download);
     else if (result.compile) compile.start(result.compile);
     else if (result.output !== null) appendOutput(result.output);
