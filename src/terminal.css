@@ -463,7 +463,8 @@ body.is-moving-pane .screen {
 }
 
 .scrollback.is-monitor > :not(.monitor),
-.scrollback.is-compile > :not(.compile) {
+.scrollback.is-compile > :not(.compile),
+.scrollback.is-algorithm > :not(.algorithm) {
   display: none !important;
 }
 
@@ -717,19 +718,70 @@ body.is-moving-pane .screen {
 }
 
 .monitor-cell.is-red,
-.monitor-plot-axis.is-red { color: #ff4d4d; }
+.monitor-plot-axis.is-red,
+.algorithm-cell.is-red { color: #ff4d4d; }
 .monitor-cell.is-orange,
-.monitor-plot-axis.is-orange { color: #ff9a3c; }
+.monitor-plot-axis.is-orange,
+.algorithm-cell.is-orange { color: #ff9a3c; }
 .monitor-cell.is-yellow,
-.monitor-plot-axis.is-yellow { color: #f5d76e; }
+.monitor-plot-axis.is-yellow,
+.algorithm-cell.is-yellow { color: #f5d76e; }
 .monitor-cell.is-green,
-.monitor-plot-axis.is-green { color: #3dd68c; }
+.monitor-plot-axis.is-green,
+.algorithm-cell.is-green { color: #3dd68c; }
 .monitor-cell.is-blue,
-.monitor-plot-axis.is-blue { color: #4da3ff; }
+.monitor-plot-axis.is-blue,
+.algorithm-cell.is-blue { color: #4da3ff; }
 .monitor-cell.is-indigo,
-.monitor-plot-axis.is-indigo { color: #6d6dff; }
+.monitor-plot-axis.is-indigo,
+.algorithm-cell.is-indigo { color: #6d6dff; }
 .monitor-cell.is-purple,
-.monitor-plot-axis.is-purple { color: #c084fc; }
+.monitor-plot-axis.is-purple,
+.algorithm-cell.is-purple { color: #c084fc; }
+
+.algorithm {
+  display: grid;
+  gap: 8px;
+  width: 100%;
+  min-width: 0;
+  margin: 6px 0 8px;
+  white-space: normal;
+  word-break: normal;
+}
+
+.algorithm-view {
+  display: grid;
+  gap: 2px;
+}
+
+.algorithm-view[hidden] {
+  display: none;
+}
+
+.algorithm-title {
+  color: #b5b5b5;
+}
+
+.algorithm-plot {
+  display: grid;
+}
+
+.algorithm-row {
+  height: 14px;
+  line-height: 14px;
+  white-space: pre;
+}
+
+.algorithm-cell {
+  display: inline-block;
+  width: 1ch;
+  text-align: center;
+  color: #8a8a8a;
+}
+
+.algorithm-cell.is-matrix-dim { color: #1f7a45; }
+.algorithm-cell.is-matrix { color: #3dd68c; }
+.algorithm-cell.is-matrix-head { color: #d8ffe8; }
 
 .taskman {
   display: grid;

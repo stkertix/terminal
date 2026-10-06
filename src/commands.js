@@ -1,3 +1,5 @@
+import { ALGORITHMS } from "./algorithms.js";
+
 const PROMPT = "user@host:~$";
 
 const FILES = {
@@ -34,6 +36,7 @@ const HELP = [
   `compile   [${COMPILER_CHOICES} MINUTES]`,
   `install   ${COMPILER_CHOICES} MINUTES LOOPS`,
   `monitor   [${CHARTS.join("|")}]`,
+  `algorithm [${ALGORITHMS.join("|")}]`,
   "top       Show the Chrome task manager",
   "htop      Show the Chrome task manager",
   "open      Open a page in this pane",
@@ -138,6 +141,15 @@ const HANDLERS = {
     if (!CHARTS.includes(chart)) return `monitor: ${args[0]}: expected ${CHARTS.join(", ").replace(/, ([^,]*)$/, ", or $1")}`;
     return { monitor: chart };
   },
+  algorithm(args) {
+    if (args.length > 1) return `algorithm: usage: algorithm [${ALGORITHMS.join("|")}]`;
+    const name = args[0] || "matrix";
+    if (!ALGORITHMS.includes(name)) {
+      const list = ALGORITHMS.join(", ").replace(/, ([^,]*)$/, ", or $1");
+      return `algorithm: ${args[0]}: expected ${list}`;
+    }
+    return { algorithm: name };
+  },
   top(args) {
     if (args.length > 0) return "top: too many arguments";
     return { top: true };
@@ -197,6 +209,7 @@ export function execute(line, state, deps = {}) {
       download: result.download ?? null,
       compile: result.compile ?? null,
       monitor: typeof result.monitor === "string" ? result.monitor : null,
+      algorithm: typeof result.algorithm === "string" ? result.algorithm : null,
       top: Boolean(result.top),
     };
   }
