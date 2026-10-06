@@ -175,7 +175,7 @@ const HANDLERS = {
     if (args.length > 1) return `play: usage: play [${GAMES.join("|")}]`;
     const name = args[0] || "soccer";
     if (!GAMES.includes(name)) {
-      const list = GAMES.join(", ").replace(/, ([^,]*)$/, ", or $1");
+      const list = GAMES.join(", ").replace(/, ([^,]*)$/, " or $1");
       return `play: ${args[0]}: expected ${list}`;
     }
     return { play: name };

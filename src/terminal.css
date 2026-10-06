@@ -855,6 +855,7 @@ body.is-moving-pane .screen {
 }
 
 .play-flash.is-goal { color: #f5d76e; }
+.play-flash.is-game { color: #d7e4ff; }
 .play-flash.is-foul { color: #ff9a3c; }
 .play-flash.is-corner { color: #d8ffe8; }
 .play-flash.is-penalty { color: #ff4d4d; }

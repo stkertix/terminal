@@ -1,4 +1,6 @@
-export const GAMES = ["soccer"];
+import { createPadel } from "./padel.js";
+
+export const GAMES = ["soccer", "padel"];
 
 const LENGTH = 105;
 const WIDTH = 68;
@@ -910,6 +912,7 @@ const GLYPHS = {
   F: ["#####", "#    ", "#    ", "#### ", "#    ", "#    ", "#    "],
   G: [" ### ", "#   #", "#    ", "# ###", "#   #", "#   #", " ### "],
   L: ["#    ", "#    ", "#    ", "#    ", "#    ", "#    ", "#####"],
+  M: ["#   #", "## ##", "# # #", "#   #", "#   #", "#   #", "#   #"],
   N: ["#   #", "##  #", "# # #", "# # #", "#  ##", "#   #", "#   #"],
   O: [" ### ", "#   #", "#   #", "#   #", "#   #", "#   #", " ### "],
   P: ["#### ", "#   #", "#   #", "#### ", "#    ", "#    ", "#    "],
@@ -981,7 +984,7 @@ export function bannerArt(call, cols = 48, rows = 16) {
   if (!call?.word) return "";
   const word = dotRows(call.word);
   let dots = word;
-  if (call.word === "GOAL") {
+  if (call.word === "GOAL" || call.word === "GAME") {
     const score = dotRows(`${call.home} - ${call.away}`);
     const width = Math.max(word[0].length, score[0].length);
     dots = [...centerDots(word, width), Array(width).fill(0), ...centerDots(score, width)];
@@ -994,6 +997,7 @@ export function bannerArt(call, cols = 48, rows = 16) {
 }
 
 export function createGame(name) {
-  if (name !== "soccer") throw new Error(`Unknown game: ${name}`);
-  return soccer();
+  if (name === "padel") return createPadel();
+  if (name === "soccer") return soccer();
+  throw new Error(`Unknown game: ${name}`);
 }
