@@ -1,5 +1,6 @@
 import { ALGORITHMS } from "./algorithms.js";
 import { GAMES } from "./games.js";
+import { formatReading } from "./tarot.js";
 
 const PROMPT = "user@host:~$";
 
@@ -39,6 +40,7 @@ const HELP = [
   `monitor   [${CHARTS.join("|")}]`,
   `algorithm [${ALGORITHMS.join("|")}]`,
   `play      [${GAMES.join("|")}]`,
+  "tarot     FULL NAME YYYY-MM-DD",
   "top       Show the Chrome task manager",
   "htop      Show the Chrome task manager",
   "open      Open a page in this pane",
@@ -56,6 +58,23 @@ function parsePageUrl(value) {
   if (url.protocol !== "http:" && url.protocol !== "https:") return null;
   if (!url.hostname) return null;
   return url;
+}
+
+const PERSON_NAME = /^[\p{L} '’-]+$/u;
+
+function isBirthDate(token, today) {
+  const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(token);
+  if (!match) return false;
+  const year = Number(match[1]);
+  const month = Number(match[2]);
+  const day = Number(match[3]);
+  if (year < 1) return false;
+  const date = new Date(0);
+  date.setFullYear(year, month - 1, day);
+  date.setHours(0, 0, 0, 0);
+  if (date.getFullYear() !== year || date.getMonth() !== month - 1 || date.getDate() !== day) return false;
+  const startToday = new Date(today.getFullYear(), today.getMonth(), today.getDate());
+  return date <= startToday;
 }
 
 function cat(args) {
@@ -160,6 +179,14 @@ const HANDLERS = {
       return `play: ${args[0]}: expected ${list}`;
     }
     return { play: name };
+  },
+  tarot(args, _state, deps) {
+    if (args.length < 2) return "tarot: usage: tarot FULL NAME YYYY-MM-DD";
+    const dateToken = args[args.length - 1];
+    if (!isBirthDate(dateToken, deps.now())) return `tarot: ${dateToken}: invalid date`;
+    const name = args.slice(0, -1).join(" ").trim().replace(/\s+/g, " ");
+    if (!name || !PERSON_NAME.test(name)) return `tarot: ${name}: invalid name`;
+    return formatReading(name, dateToken);
   },
   top(args) {
     if (args.length > 0) return "top: too many arguments";

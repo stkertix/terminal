@@ -59,6 +59,7 @@ Each pane has a **Shell** / **Simulator** switch. Shell is tried first. If nativ
 | `monitor [CHART]`            | Show a fake host dashboard                          |
 | `algorithm [KIND]`           | Show an ASCII visualization                         |
 | `play [soccer]`              | Watch a top-down soccer match                      |
+| `tarot FULL NAME YYYY-MM-DD` | Read three tarot cards from a name and birth date  |
 | `top`, `htop`                | Show the Chrome task manager                        |
 | `open <url>`                 | Open a page in this pane                            |
 | `exit`                       | Close this tab, or the window if it is the last tab |
