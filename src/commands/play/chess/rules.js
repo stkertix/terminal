@@ -17,7 +17,8 @@ const KNIGHT_D = [14, 18, 31, 33, -14, -18, -31, -33];
 const KING_D = [1, -1, 16, -16, 15, 17, -15, -17];
 const BISHOP_D = [15, 17, -15, -17];
 const ROOK_D = [1, -1, 16, -16];
-const GLYPH = ["", "P", "N", "B", "R", "Q", "K"];
+const WHITE_GLYPH = ["", "♙", "♘", "♗", "♖", "♕", "♔"];
+const BLACK_GLYPH = ["", "♟", "♞", "♝", "♜", "♛", "♚"];
 const FEN_CHAR = ["", "P", "N", "B", "R", "Q", "K", "", "", "p", "n", "b", "r", "q", "k"];
 const CODE = {
   P: WP, N: WN, B: WB, R: WR, Q: WQ, K: WK,
@@ -45,7 +46,8 @@ export function isWhitePiece(piece) {
 
 export function glyph(piece) {
   if (!piece) return "";
-  return GLYPH[pieceKind(piece)];
+  const table = isWhitePiece(piece) ? WHITE_GLYPH : BLACK_GLYPH;
+  return table[pieceKind(piece)];
 }
 
 export function fileOf(sq) {

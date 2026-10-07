@@ -13,7 +13,7 @@
 .play-view.is-chess .play-field {
   display: grid;
   align-content: start;
-  width: 20.6em;
+  width: max-content;
 }
 
 .play-view.is-chess .play-head {
@@ -113,30 +113,61 @@
 .play-view.is-chess .play-call.is-neutral { color: #c6c6c6; }
 
 .chess-board {
+  --sq: 56px;
+  position: relative;
   margin-top: 8px;
   user-select: none;
 }
 
-.chess-row {
-  display: grid;
-  grid-template-columns: 1.4em repeat(8, 2.15em);
-  height: 2.15em;
-  line-height: 2.15em;
+.chess-flyer {
+  position: absolute;
+  left: 0;
+  top: 0;
+  z-index: 3;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  pointer-events: none;
+  font-family: "Segoe UI Symbol", "Segoe UI", "Noto Sans Symbols 2", sans-serif;
+  font-size: calc(var(--sq) * 0.72);
+  font-weight: 400;
+  line-height: 1;
 }
 
-.chess-row.is-files { height: 1.4em; line-height: 1.4em; }
+.chess-flyer.is-white { color: #f7f7f7; }
+.chess-flyer.is-black { color: #4da3ff; }
+
+.chess-row {
+  display: grid;
+  grid-template-columns: 1.6em repeat(8, var(--sq));
+  height: var(--sq);
+}
+
+.chess-row.is-files {
+  height: 1.5em;
+  line-height: 1.5em;
+}
 
 .chess-lab,
 .chess-file {
   color: #8a8a8a;
   text-align: center;
+  line-height: var(--sq);
+}
+
+.chess-row.is-files .chess-lab,
+.chess-row.is-files .chess-file {
+  line-height: 1.5em;
 }
 
 .chess-sq {
   display: flex;
   align-items: center;
   justify-content: center;
-  font-weight: 600;
+  font-family: "Segoe UI Symbol", "Segoe UI", "Noto Sans Symbols 2", sans-serif;
+  font-size: calc(var(--sq) * 0.72);
+  font-weight: 400;
+  line-height: 1;
 }
 
 .chess-sq.is-light { background: #2c2c2c; }

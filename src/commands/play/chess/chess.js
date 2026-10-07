@@ -165,6 +165,7 @@ export function createChess(seed = Math.floor(Math.random() * 0xffffffff)) {
   const sans = [];
   let lastFrom = -1;
   let lastTo = -1;
+  let glide = null;
   let scrambleNoted = false;
   let stamp = "";
   const FAMILY_LABEL = {
@@ -540,6 +541,18 @@ export function createChess(seed = Math.floor(Math.random() * 0xffffffff)) {
       return;
     }
     stamp = clockText(player.clock);
+    const moverWhite = player.side === "w";
+    const travel = glyph(plan.move.piece);
+    const land = glyph(plan.move.promo || plan.move.piece);
+    const capturedGlyph = plan.move.captured ? glyph(plan.move.captured) : "";
+    const capturedSq = plan.move.captured
+      ? plan.move.to + (plan.move.flag === 1 ? (moverWhite ? -16 : 16) : 0)
+      : -1;
+    const rook = plan.move.flag === 2 ? {
+      from: plan.move.to > plan.move.from ? plan.move.from + 3 : plan.move.from - 4,
+      to: plan.move.to > plan.move.from ? plan.move.from + 1 : plan.move.from - 1,
+      glyph: glyph(moverWhite ? 4 : 12),
+    } : null;
     const san = toSan(pos, plan.move);
     const uci = toUci(plan.move);
     const checkedBefore = inCheck(pos);
@@ -548,6 +561,17 @@ export function createChess(seed = Math.floor(Math.random() * 0xffffffff)) {
     sans.push(san);
     lastFrom = plan.move.from;
     lastTo = plan.move.to;
+    glide = {
+      id: history.length,
+      from: plan.move.from,
+      to: plan.move.to,
+      travel,
+      land,
+      white: moverWhite,
+      capturedGlyph,
+      capturedSq,
+      rook,
+    };
     evalNow = evaluate(pos);
     const mark = plan.book ? "" : plan.loss >= 320 ? " ??" : plan.loss >= 160 ? " ?" : plan.loss >= 90 ? " ?!" : plan.critical && plan.loss < 20 ? " !" : "";
     const number = pos.side === "b" ? `${pos.full}.` : `${pos.full - 1}...`;
@@ -629,7 +653,9 @@ export function createChess(seed = Math.floor(Math.random() * 0xffffffff)) {
       else finish("STALEMATE", null);
       return;
     }
-    const ticks = clamp(Math.round(plan.seconds * 1.2), 2, 16);
+    const floor = player.clock < 10 ? 9 : 16;
+    const cap = player.clock < 10 ? 18 : 34;
+    const ticks = clamp(Math.round(floor + plan.seconds * 0.55), floor, cap);
     pending = plan;
     pending.ticks = ticks;
     thinkLeft = ticks;
@@ -668,6 +694,9 @@ export function createChess(seed = Math.floor(Math.random() * 0xffffffff)) {
     },
     commentary() {
       return { text: voice.text, tone: voice.tone };
+    },
+    motion() {
+      return glide;
     },
     board() {
       const squares = [];

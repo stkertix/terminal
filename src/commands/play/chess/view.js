@@ -100,6 +100,15 @@ export function createChessView(env) {
       files.append(label);
     });
     boardHost.append(files);
+    const makeFlyer = () => {
+      const node = document.createElement("div");
+      node.className = "chess-flyer";
+      node.hidden = true;
+      boardHost.append(node);
+      return node;
+    };
+    const flyer = makeFlyer();
+    const rookFlyer = makeFlyer();
     const field = document.createElement("div");
     field.className = "play-field";
     field.append(title, boardHost, bottom);
@@ -113,6 +122,33 @@ export function createChessView(env) {
     env.element.classList.add("is-match");
     const startedAt = performance.now();
     let closed = false;
+    let seenMove = 0;
+    let active = null;
+    let flying = false;
+    let flyTimer = 0;
+    const slideMs = 680;
+
+    const cellIndex = (sq) => (7 - (sq >> 4)) * 8 + (sq & 7);
+
+    const pin = (node, sq) => {
+      const square = squares[cellIndex(sq)];
+      const boardBox = boardHost.getBoundingClientRect();
+      const box = square.getBoundingClientRect();
+      node.style.width = `${box.width}px`;
+      node.style.height = `${box.height}px`;
+      node.style.transform = `translate(${box.left - boardBox.left}px, ${box.top - boardBox.top}px)`;
+    };
+
+    const hidePiece = (el) => {
+      el.textContent = "";
+      el.classList.remove("is-white", "is-black");
+    };
+
+    const showPiece = (el, text, white) => {
+      el.textContent = text;
+      el.classList.toggle("is-white", Boolean(text) && white);
+      el.classList.toggle("is-black", Boolean(text) && !white);
+    };
 
     const paintSide = (card, player, team) => {
       const playerName = card.querySelector(".play-side-name");
@@ -156,11 +192,58 @@ export function createChessView(env) {
         if (square.className !== marks) square.className = marks;
         if (square.textContent !== cell.glyph) square.textContent = cell.glyph;
       });
+      if (!active) return;
+      hidePiece(squares[cellIndex(active.from)]);
+      const dest = squares[cellIndex(active.to)];
+      if (active.capturedSq === active.to) showPiece(dest, active.capturedGlyph, !active.white);
+      else hidePiece(dest);
+      if (active.capturedSq >= 0 && active.capturedSq !== active.to) {
+        showPiece(squares[cellIndex(active.capturedSq)], active.capturedGlyph, !active.white);
+      }
+      if (active.rook) {
+        hidePiece(squares[cellIndex(active.rook.from)]);
+        hidePiece(squares[cellIndex(active.rook.to)]);
+      }
+    };
+
+    const slidePiece = (node, from, to, text, white) => {
+      node.hidden = false;
+      node.textContent = text;
+      node.className = `chess-flyer ${white ? "is-white" : "is-black"}`;
+      node.style.transition = "none";
+      pin(node, from);
+      node.getBoundingClientRect();
+      node.style.transition = `transform ${slideMs}ms cubic-bezier(.22, .72, .24, 1)`;
+      pin(node, to);
+    };
+
+    const launch = (move) => {
+      clearTimeout(flyTimer);
+      active = move;
+      flying = true;
+      paint();
+      slidePiece(flyer, move.from, move.to, move.travel, move.white);
+      if (move.rook) slidePiece(rookFlyer, move.rook.from, move.rook.to, move.rook.glyph, move.white);
+      else rookFlyer.hidden = true;
+      if (move.land !== move.travel) {
+        setTimeout(() => {
+          if (active === move) flyer.textContent = move.land;
+        }, Math.round(slideMs * 0.62));
+      }
+      flyTimer = setTimeout(() => {
+        if (active !== move) return;
+        flying = false;
+        active = null;
+        flyer.hidden = true;
+        rookFlyer.hidden = true;
+        paint();
+      }, slideMs + 40);
     };
 
     const finish = (outcome) => {
       if (closed || !panel.isConnected) return;
       closed = true;
+      clearTimeout(flyTimer);
       detachKeys();
       stop();
       view.remove();
@@ -200,9 +283,18 @@ export function createChessView(env) {
     const fit = () => {
       if (!panel.isConnected || closed) return;
       const styles = getComputedStyle(env.scrollback);
+      const padX = (parseFloat(styles.paddingLeft) || 0) + (parseFloat(styles.paddingRight) || 0);
       const padY = (parseFloat(styles.paddingTop) || 0) + (parseFloat(styles.paddingBottom) || 0);
-      const room = env.scrollback.clientHeight - padY - env.form.offsetHeight - 12;
-      view.style.minHeight = `${Math.max(320, room)}px`;
+      const roomH = env.scrollback.clientHeight - padY - env.form.offsetHeight - 12;
+      const roomW = env.scrollback.clientWidth - padX - 28;
+      view.style.minHeight = `${Math.max(360, roomH)}px`;
+      const chrome = title.offsetHeight + bottom.offsetHeight + 28;
+      const label = 22;
+      const byH = Math.floor((roomH - chrome) / 8);
+      const byW = Math.floor((roomW * 0.72 - label) / 8);
+      const size = Math.max(48, Math.min(byH, byW, 88));
+      boardHost.style.setProperty("--sq", `${size}px`);
+      field.style.width = `${label + size * 8}px`;
     };
 
     playJob = {
@@ -213,9 +305,10 @@ export function createChessView(env) {
     env.syncBusy();
     fit();
     paint();
+    requestAnimationFrame(() => fit());
     playFitObserver = new ResizeObserver(() => fit());
     playFitObserver.observe(env.scrollback);
-    const tickMs = 100;
+    const tickMs = 150;
     let lastFrame = 0;
     let pending = 0;
     const restart = () => {
@@ -224,6 +317,12 @@ export function createChessView(env) {
       started = true;
       pending = 0;
       lastFrame = 0;
+      seenMove = 0;
+      active = null;
+      flying = false;
+      clearTimeout(flyTimer);
+      flyer.hidden = true;
+      rookFlyer.hidden = true;
       paint();
     };
     detachKeys = listenPlayKeys(env, {
@@ -241,13 +340,14 @@ export function createChessView(env) {
     const frame = (now) => {
       if (closed) return;
       if (!panel.isConnected) {
+        clearTimeout(flyTimer);
         detachKeys();
         playJob = null;
         stop();
         env.syncBusy();
         return;
       }
-      if (!started) {
+      if (!started || flying) {
         pending = 0;
         lastFrame = now;
         paint();
@@ -258,13 +358,18 @@ export function createChessView(env) {
       pending += Math.min(tickMs, now - lastFrame);
       lastFrame = now;
       let steps = 0;
-      while (pending >= tickMs && steps < 4) {
+      while (pending >= tickMs && steps < 1) {
         sim.step();
         pending -= tickMs;
         steps += 1;
         if (sim.done || sim.holding) break;
       }
-      paint();
+      const motion = sim.motion();
+      if (motion && motion.id !== seenMove) {
+        seenMove = motion.id;
+        pending = 0;
+        launch(motion);
+      } else paint();
       if (sim.holding || !sim.done) {
         playTimer = requestAnimationFrame(frame);
         return;
