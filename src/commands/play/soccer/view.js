@@ -125,10 +125,10 @@ export function createSoccerView(env) {
     };
     const homeCard = makeSide("home");
     const awayCard = makeSide("away");
-    const stage = document.createElement("div");
-    stage.className = "play-stage";
     const plot = document.createElement("div");
     plot.className = "play-plot";
+    const plotSide = document.createElement("div");
+    plotSide.className = "play-plot";
     const caption = document.createElement("div");
     caption.className = "play-call";
     caption.hidden = true;
@@ -137,8 +137,7 @@ export function createSoccerView(env) {
     bottom.append(homeCard, caption, awayCard);
     const field = document.createElement("div");
     field.className = "play-field";
-    stage.append(plot);
-    field.append(title, stage, bottom);
+    field.append(title, plot, bottom, plotSide);
     const history = document.createElement("div");
     history.className = "play-log";
     const log = mountPlayLog(history);
@@ -151,7 +150,9 @@ export function createSoccerView(env) {
     let closed = false;
     let gridRows = 0;
     let gridCols = 0;
+    let gridSide = 0;
     let spans = [];
+    let sideSpans = [];
 
     const paintSide = (card, player, team) => {
       card.hidden = !player;
@@ -181,6 +182,7 @@ export function createSoccerView(env) {
       caption.className = line.text ? `play-call is-${line.tone}` : "play-call";
       paintPlayLog(log, sim.feed());
       paintCells(spans, sim.cells(), gridCols);
+      paintCells(sideSpans, sim.sideCells(), gridCols);
     };
 
     const finish = (result) => {
@@ -238,6 +240,21 @@ export function createSoccerView(env) {
         }
         plot.append(line);
       }
+      plotSide.replaceChildren();
+      sideSpans = [];
+      const sideRows = sim.sideRows();
+      for (let row = 0; row < sideRows; row += 1) {
+        const line = document.createElement("div");
+        line.className = "play-row";
+        for (let col = 0; col < gridCols; col += 1) {
+          const span = document.createElement("span");
+          span.className = "play-cell";
+          span.textContent = " ";
+          line.append(span);
+          sideSpans.push(span);
+        }
+        plotSide.append(line);
+      }
     };
 
     const fit = () => {
@@ -247,21 +264,34 @@ export function createSoccerView(env) {
       const padY = (parseFloat(styles.paddingTop) || 0) + (parseFloat(styles.paddingBottom) || 0);
       const panelStyles = getComputedStyle(panel);
       const marginY = (parseFloat(panelStyles.marginTop) || 0) + (parseFloat(panelStyles.marginBottom) || 0);
-      const chrome = panel.offsetHeight - plot.offsetHeight;
+      const chrome = panel.offsetHeight - plot.offsetHeight - plotSide.offsetHeight;
       const roomH = env.scrollback.clientHeight - padY - chrome - env.form.offsetHeight - marginY;
       const roomW = env.scrollback.clientWidth - padX;
+      const probeRow = document.createElement("div");
+      probeRow.className = "play-row";
       const probe = document.createElement("span");
       probe.className = "play-cell";
       probe.textContent = "0";
-      plot.append(probe);
+      probeRow.append(probe);
+      plot.append(probeRow);
       const ch = probe.getBoundingClientRect().width || 8;
-      probe.remove();
+      const rowH = probeRow.getBoundingClientRect().height || 14;
+      probeRow.remove();
       const pitch = sim.pitch();
-      const rowH = 14;
       const benchRows = 6;
+      const sideFull = 8;
+      const sideMin = 3;
+      const fieldMin = 6;
       const logPx = 42 * ch + 16;
       const maxW = Math.max(ch * 16, roomW - logPx);
-      const maxH = Math.max(rowH * 8, roomH);
+      const budget = Math.floor(Math.max(0, roomH) / rowH);
+      let sideRows = sideFull;
+      let fieldRows = budget - sideRows - benchRows;
+      if (fieldRows < fieldMin) {
+        const give = Math.min(Math.max(0, fieldMin - fieldRows), sideRows - sideMin);
+        sideRows -= give;
+        fieldRows = Math.max(4, budget - sideRows - benchRows);
+      }
       const dotX = ch / 2;
       const dotY = rowH / 4;
       const colsFor = (pitchRows) => {
@@ -269,28 +299,48 @@ export function createSoccerView(env) {
         const dotW = (pitch.length / pitch.width) * dotH * (dotY / dotX);
         return Math.max(16, Math.round((dotW + 3) / 2));
       };
-      let rows = Math.max(8, Math.floor(maxH / rowH) - benchRows);
-      let cols = colsFor(rows);
-      while (rows > 8 && cols * ch > maxW + 0.5) {
-        rows -= 1;
-        cols = colsFor(rows);
+      const measure = () => {
+        const limit = env.scrollback.clientHeight - padY - env.form.offsetHeight - marginY;
+        return panel.offsetHeight - limit;
+      };
+      const place = (nextField, nextSide) => {
+        let rows = Math.max(4, nextField);
+        let cols = colsFor(rows);
+        while (rows > 4 && cols * ch > maxW + 0.5) {
+          rows -= 1;
+          cols = colsFor(rows);
+        }
+        if (cols * ch > maxW + 0.5) {
+          cols = Math.max(16, Math.floor(maxW / ch));
+          const dotW = Math.max(8, cols * 2 - 3);
+          const dotH = dotW * (pitch.width / pitch.length) * (dotX / dotY);
+          rows = Math.max(4, Math.round((dotH + 3) / 4));
+          cols = colsFor(rows);
+          if (cols * ch > maxW + 0.5) cols = Math.max(16, Math.floor(maxW / ch));
+        }
+        const pitchRows = rows + benchRows;
+        const same = pitchRows === gridRows && cols === gridCols && nextSide === gridSide
+          && spans.length === pitchRows * cols && sideSpans.length === nextSide * cols;
+        if (!same) {
+          gridRows = pitchRows;
+          gridCols = cols;
+          gridSide = nextSide;
+          sim.reset(gridCols * 2, gridRows * 4, gridSide);
+          rebuildPlot();
+          paint();
+        }
+        fieldRows = rows;
+        sideRows = nextSide;
+      };
+      place(fieldRows, sideRows);
+      let guard = 0;
+      while (measure() > 1 && guard < 24) {
+        guard += 1;
+        if (fieldRows > 4) place(fieldRows - 1, sideRows);
+        else if (sideRows > sideMin) place(fieldRows, sideRows - 1);
+        else break;
       }
-      if (cols * ch > maxW + 0.5) {
-        cols = Math.max(16, Math.floor(maxW / ch));
-        const dotW = Math.max(8, cols * 2 - 3);
-        const dotH = dotW * (pitch.width / pitch.length) * (dotX / dotY);
-        rows = Math.max(8, Math.round((dotH + 3) / 4));
-        cols = colsFor(rows);
-        if (cols * ch > maxW + 0.5) cols = Math.max(16, Math.floor(maxW / ch));
-      }
-      rows += benchRows;
-      if (rows === gridRows && cols === gridCols && spans.length === rows * cols) return;
-      gridRows = rows;
-      gridCols = cols;
-      sim.reset(gridCols * 2, gridRows * 4);
-      rebuildPlot();
-      paint();
-      env.scrollToEnd();
+      env.scrollback.scrollTop = 0;
     };
 
     playJob = {
@@ -311,7 +361,7 @@ export function createSoccerView(env) {
       started = true;
       pending = 0;
       lastFrame = 0;
-      if (gridCols && gridRows) sim.reset(gridCols * 2, gridRows * 4);
+      if (gridCols && gridRows) sim.reset(gridCols * 2, gridRows * 4, gridSide);
       paint();
     };
     detachKeys = listenPlayKeys(env, {

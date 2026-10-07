@@ -40,11 +40,16 @@ const STAFF = {
 const SUBS_MAX = 3;
 const BENCH_CHAR_ROWS = 6;
 const BENCH_DOTS = BENCH_CHAR_ROWS * 4;
+const SIDE_CHAR = 8;
+const SKY = 8;
+const GOAL_H = 2.44;
 
 export function soccer() {
   let cols = 24;
   let rows = 10;
   let cells = [];
+  let sideChars = SIDE_CHAR;
+  let sideCells = [];
   let players = [];
   let ball = null;
   let owner = null;
@@ -235,6 +240,7 @@ export function soccer() {
     if (ball) {
       ball.px = ball.x;
       ball.py = ball.y;
+      ball.pz = ball.z;
     }
     if (referee) {
       referee.px = referee.x;
@@ -253,6 +259,121 @@ export function soccer() {
     const dy = entity.y - py;
     if (!(alpha < 1) || dx * dx + dy * dy > 0.04) return { x: entity.x, y: entity.y };
     return { x: px + dx * alpha, y: py + dy * alpha };
+  };
+
+  const arcZ = (peak, t) => {
+    const u = clamp(t, 0, 1);
+    const start = 0.4;
+    const end = 0.18;
+    const control = 2 * peak - 0.5 * start - 0.5 * end;
+    const rest = 1 - u;
+    return rest * rest * start + 2 * rest * u * control + u * u * end;
+  };
+
+  const tickAir = () => {
+    if (!ball) return;
+    if (owner || !ball.flight) {
+      ball.flight = null;
+      ball.z = 0.22;
+      return;
+    }
+    ball.flight.age += 1;
+    const t = ball.flight.age / ball.flight.duration;
+    if (t >= 1) {
+      ball.flight = null;
+      ball.z = 0.18;
+      return;
+    }
+    ball.z = arcZ(ball.flight.peak, t);
+  };
+
+  const drawElevation = (alpha) => {
+    const sRows = sideChars * 4;
+    sideCells = Array.from({ length: cols * sRows }, () => ({ lit: false, tone: "", glyph: "" }));
+    const mark = (col, row, tone) => {
+      if (col < 0 || row < 0 || col >= cols || row >= sRows) return;
+      const cell = sideCells[row * cols + col];
+      if (!cell || cell.glyph) return;
+      cell.lit = true;
+      cell.tone = tone;
+    };
+    const toSide = (pitchX, meters) => ({
+      col: clamp(Math.round(clamp(pitchX, 0, 1) * (cols - 1)), 0, cols - 1),
+      row: clamp(Math.round((1 - clamp(meters, 0, SKY) / SKY) * (sRows - 1)), 0, sRows - 1),
+    });
+    const stroke = (x0, z0, x1, z1, tone) => {
+      const from = toSide(x0, z0);
+      const to = toSide(x1, z1);
+      const steps = Math.max(Math.abs(to.col - from.col), Math.abs(to.row - from.row), 1);
+      for (let index = 0; index <= steps; index += 1) {
+        const t = index / steps;
+        mark(
+          Math.round(from.col + (to.col - from.col) * t),
+          Math.round(from.row + (to.row - from.row) * t),
+          tone,
+        );
+      }
+    };
+    stroke(0, 0, 1, 0, "is-line");
+    stroke(0, 0, 0, GOAL_H, "is-white");
+    stroke(1, 0, 1, GOAL_H, "is-white");
+    const ballX = spotOf(ball, alpha).x;
+    const ballZ = (ball.pz ?? ball.z ?? 0.22) + ((ball.z ?? 0.22) - (ball.pz ?? ball.z ?? 0.22)) * (alpha < 1 ? alpha : 1);
+    const kicker = owner && !owner.out
+      ? owner
+      : (ball.flight && ball.flight.age <= 3 && ball.ignore && !ball.ignore.out ? ball.ignore : null);
+    const drawPerson = (player) => {
+      if (!player || player.out || player.conceal) return;
+      const x = spotOf(player, alpha).x;
+      const dir = facesRight(player.side) ? 1 : -1;
+      const tone = player.side === "home" ? "is-blue" : "is-red";
+      const mx = (meters) => meters / LENGTH;
+      stroke(x - dir * mx(0.55), 0, x - dir * mx(0.12), 0.95, tone);
+      stroke(x + dir * mx(0.7), 0, x + dir * mx(0.12), 0.95, tone);
+      stroke(x, 0.95, x, 1.48, tone);
+      const headZ = 1.68;
+      for (let index = 0; index < 6; index += 1) {
+        const a0 = (index / 6) * Math.PI * 2;
+        const a1 = ((index + 1) / 6) * Math.PI * 2;
+        stroke(
+          x + Math.cos(a0) * mx(0.55),
+          headZ + Math.sin(a0) * 0.22,
+          x + Math.cos(a1) * mx(0.55),
+          headZ + Math.sin(a1) * 0.22,
+          tone,
+        );
+      }
+      if (player === kicker) {
+        const dx = (ballX - x) * LENGTH;
+        const dz = ballZ - 0.85;
+        const dist = Math.hypot(dx, dz) || 1;
+        const scale = Math.min(1, 1.35 / dist);
+        stroke(x, 0.85, x + (dx * scale) / LENGTH, 0.85 + dz * scale, tone);
+      }
+    };
+    players.forEach((player) => {
+      if (player !== kicker) drawPerson(player);
+    });
+    drawPerson(kicker);
+    const charCols = Math.max(1, Math.floor(cols / 2));
+    const charRows = sideChars;
+    const stamp = (col, row, glyph, tone) => {
+      if (col < 0 || row < 0 || col >= charCols || row >= charRows) return;
+      sideCells[row * 4 * cols + col * 2] = { lit: true, tone, glyph };
+    };
+    const charAt = (pitchX, meters) => {
+      const dot = toSide(pitchX, meters);
+      return {
+        col: clamp(Math.floor(dot.col / 2), 0, charCols - 1),
+        row: clamp(Math.floor(dot.row / 4), 0, charRows - 1),
+      };
+    };
+    confetti.forEach((bit) => {
+      const spot = charAt(bit.x, (1 - clamp(bit.y, 0, 1)) * (SKY - 0.4));
+      stamp(spot.col, spot.row, bit.glyph, bit.tone);
+    });
+    const ballSpot = charAt(ballX, ballZ);
+    stamp(ballSpot.col, ballSpot.row, "●", "is-white");
   };
 
   const render = (alpha = 1) => {
@@ -472,6 +593,7 @@ export function soccer() {
       }
       stamp(markerCol, nameRow + 1, "●", tone);
     });
+    drawElevation(alpha);
   };
 
   const clockText = () => {
@@ -570,7 +692,7 @@ export function soccer() {
         player.mark = { x: player.slotX, y: player.slotY };
       });
     }
-    ball = { x: 0.5, y: 0.5, vx: 0, vy: 0, ignore: null, cool: 0, touch: kickSide };
+    ball = { x: 0.5, y: 0.5, z: 0.22, vx: 0, vy: 0, ignore: null, cool: 0, touch: kickSide, flight: null, pz: 0.22 };
     if (!referee) referee = { x: 0.5, y: 0.72, px: 0.5, py: 0.72 };
     if (!linesmen) {
       const top = outsideSpot(0.25, 0);
@@ -627,6 +749,8 @@ export function soccer() {
     phase = null;
     ball.vx = 0;
     ball.vy = 0;
+    ball.flight = null;
+    ball.z = 0.22;
     celebrate = {
       side,
       scorer,
@@ -1324,6 +1448,7 @@ export function soccer() {
   const runInjury = () => {
     if (!injury) return false;
     if (injury.phase === "down" || injury.phase === "treat" || injury.phase === "carry") {
+      capture();
       stepTreatment();
       return true;
     }
@@ -1571,6 +1696,9 @@ export function soccer() {
     ball.vx = (dx / dist) * speed;
     ball.vy = (dy / dist) * speed;
     ball.ignore = from;
+    const peak = speed >= SHOT_SPEED * 0.75 ? 5.6 : dist > 0.32 ? 4 : dist > 0.18 ? 1.9 : 0.55;
+    ball.flight = { age: 0, duration: Math.max(6, Math.round(dist / Math.max(speed, 0.02))), peak };
+    ball.z = 0.4;
     ball.cool = 5;
     ball.touch = from.side;
     from.passCool = 8;
@@ -1691,6 +1819,8 @@ export function soccer() {
     ball.y = spot.y;
     ball.vx = 0;
     ball.vy = 0;
+    ball.flight = null;
+    ball.z = 0.22;
     ball.cool = 0;
     ball.ignore = null;
     ball.touch = side;
@@ -1970,6 +2100,8 @@ export function soccer() {
     ball.y = owner.y;
     ball.vx = 0;
     ball.vy = 0;
+    ball.flight = null;
+    ball.z = 0.22;
     ball.touch = best.side;
     return true;
   };
@@ -2022,6 +2154,8 @@ export function soccer() {
     best.passCool = 6;
     ball.vx = 0;
     ball.vy = 0;
+    ball.flight = null;
+    ball.z = 0.22;
     ball.touch = best.side;
     return true;
   };
@@ -2062,13 +2196,16 @@ export function soccer() {
     if (Math.hypot(ball.vx, ball.vy) < 0.004) {
       ball.vx = 0;
       ball.vy = 0;
+      ball.flight = null;
+      ball.z = 0.18;
     }
   };
 
   return {
-    reset(nextCols, nextRows) {
+    reset(nextCols, nextRows, nextSide) {
       cols = Math.max(8, nextCols);
       rows = Math.max(8, nextRows);
+      if (nextSide) sideChars = Math.max(3, Math.min(SIDE_CHAR, Math.round(nextSide)));
       if (!live) {
         live = true;
         kickoff();
@@ -2223,6 +2360,7 @@ export function soccer() {
         const spot = anchor(player);
         moveToward(player, spot.x, spot.y, effort(player, SPEED[player.role]));
       });
+      tickAir();
       if (owner) {
         ball.x = owner.x;
         ball.y = owner.y;
@@ -2236,6 +2374,12 @@ export function soccer() {
     },
     cells() {
       return cells;
+    },
+    sideCells() {
+      return sideCells;
+    },
+    sideRows() {
+      return sideChars;
     },
     events() {
       return log.map((item) => (

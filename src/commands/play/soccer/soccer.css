@@ -1,3 +1,7 @@
+.scrollback.is-play:has(.play-view.is-soccer) {
+  overflow: hidden;
+}
+
 .play-view.is-soccer {
   grid-template-columns: max-content minmax(0, 1fr);
   align-items: stretch;
@@ -16,7 +20,7 @@
   grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
   align-items: end;
   gap: 12px;
-  margin-top: 8px;
+  margin: 8px 0;
   width: 0;
   min-width: 100%;
 }
