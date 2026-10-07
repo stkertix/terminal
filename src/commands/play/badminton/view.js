@@ -125,10 +125,12 @@ export function createBadmintonView(env) {
     };
     const homeCard = makeSide("home");
     const awayCard = makeSide("away");
-    const stage = document.createElement("div");
-    stage.className = "play-stage";
-    const plot = document.createElement("div");
-    plot.className = "play-plot";
+    const plotTop = document.createElement("div");
+    plotTop.className = "play-plot";
+    const plotSide = document.createElement("div");
+    plotSide.className = "play-plot";
+    const plotGap = document.createElement("div");
+    plotGap.hidden = true;
     const caption = document.createElement("div");
     caption.className = "play-call";
     caption.hidden = true;
@@ -137,8 +139,7 @@ export function createBadmintonView(env) {
     bottom.append(homeCard, caption, awayCard);
     const field = document.createElement("div");
     field.className = "play-field";
-    stage.append(plot);
-    field.append(title, stage, bottom);
+    field.append(title, plotTop, bottom, plotSide, plotGap);
     const history = document.createElement("div");
     history.className = "play-log";
     const log = mountPlayLog(history);
@@ -224,8 +225,11 @@ export function createBadmintonView(env) {
     };
 
     const rebuildPlot = () => {
-      plot.replaceChildren();
+      plotTop.replaceChildren();
+      plotSide.replaceChildren();
+      plotGap.replaceChildren();
       spans = [];
+      const bands = sim.bands();
       for (let row = 0; row < gridRows; row += 1) {
         const line = document.createElement("div");
         line.className = "play-row";
@@ -236,7 +240,8 @@ export function createBadmintonView(env) {
           line.append(span);
           spans.push(span);
         }
-        plot.append(line);
+        const host = row < bands.courtRows ? plotTop : row < bands.sideRow ? plotGap : plotSide;
+        host.append(line);
       }
     };
 
@@ -247,13 +252,13 @@ export function createBadmintonView(env) {
       const padY = (parseFloat(styles.paddingTop) || 0) + (parseFloat(styles.paddingBottom) || 0);
       const panelStyles = getComputedStyle(panel);
       const marginY = (parseFloat(panelStyles.marginTop) || 0) + (parseFloat(panelStyles.marginBottom) || 0);
-      const chrome = panel.offsetHeight - plot.offsetHeight;
+      const chrome = panel.offsetHeight - plotTop.offsetHeight - plotSide.offsetHeight;
       const roomH = env.scrollback.clientHeight - padY - chrome - env.form.offsetHeight - marginY;
       const roomW = env.scrollback.clientWidth - padX;
       const probe = document.createElement("span");
       probe.className = "play-cell";
       probe.textContent = "0";
-      plot.append(probe);
+      plotTop.append(probe);
       const ch = probe.getBoundingClientRect().width || 8;
       probe.remove();
       const pitch = sim.pitch();

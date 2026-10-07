@@ -17,6 +17,49 @@ const other = (side) => (side === "home" ? "away" : "home");
 const clamp = (value, min, max) => Math.min(max, Math.max(min, value));
 const lerp = (a, b, t) => a + (b - a) * t;
 
+const SKY = 6.6;
+const GAP = 0.9;
+
+const SHOT_ARC = {
+  serve: [[1.05, 2.35, 0.5], [0.9, 1.35, 0.85]],
+  "serve-out": [[1.05, 2.9, 0.25], [0.9, 1.55, 0.45]],
+  "serve-net": [[1.05, 1.7, 1.48], [0.95, 1.4, 1.5]],
+  let: [[1.05, 1.9, 1.52], [0.95, 1.5, 1.5]],
+  clear: [[2.45, 5.4, 1.65], [1.45, 2.05, 1.15]],
+  drop: [[2.4, 2.9, 0.55], [1.45, 1.7, 0.95]],
+  drive: [[1.45, 1.75, 1.25], [1.1, 1.25, 1.08]],
+  smash: [[2.7, 2.2, 0.3], [1.55, 1.7, 1.15]],
+  winner: [[2.7, 2.1, 0.22], [1.55, 1.65, 1.05]],
+  net: [[1.15, 1.5, 1.52], [1.05, 1.28, 1.5]],
+  out: [[2.4, 3.5, 0.35], [1.5, 2.0, 0.55]],
+};
+
+const SHOT_COST = {
+  smash: 4.4,
+  winner: 4.4,
+  clear: 3.1,
+  out: 2.8,
+  drive: 2.2,
+  serve: 1.8,
+  drop: 1.2,
+  "serve-out": 1.1,
+  net: 1,
+  "serve-net": 0.8,
+  let: 0.7,
+};
+
+function heightOf(kind, t, power = 1) {
+  const u = clamp(t, 0, 1);
+  const [full, weak] = SHOT_ARC[kind] || [[1.8, 3.2, 0.4], [1.25, 1.6, 1.05]];
+  const p = clamp(power, 0, 1);
+  const start = weak[0] + (full[0] - weak[0]) * p;
+  const peak = weak[1] + (full[1] - weak[1]) * p;
+  const end = weak[2] + (full[2] - weak[2]) * p;
+  const control = 2 * peak - 0.5 * start - 0.5 * end;
+  const rest = 1 - u;
+  return rest * rest * start + 2 * rest * u * control + u * u * end;
+}
+
 function sample(motion, t) {
   const u = clamp(t, 0, 1);
   if (!motion.via) {
@@ -63,7 +106,7 @@ export function createBadminton() {
     slotY: 0.5,
     stamina: 100,
   }));
-  const ball = { x: 0.1, y: 0.74, px: 0.1, py: 0.74 };
+  const ball = { x: 0.1, y: 0.74, z: 1.05, px: 0.1, py: 0.74, pz: 1.05 };
 
   const by = (side, role) => players.find((player) => player.side === side && player.role === role);
   const sideName = (side) => (side === "home" ? "Home" : "Away");
@@ -105,15 +148,24 @@ export function createBadminton() {
     cell.tone = tone;
   };
 
+  const stack = WIDTH + GAP + SKY;
+
+  const courtToCell = (x, y) => pitchToCell(clamp(x, 0, 1), clamp(y, 0, 1) * (WIDTH / stack));
+
+  const toSide = (courtX, meters) => {
+    const z = clamp(meters, 0, SKY);
+    return pitchToCell(clamp(courtX, 0, 1), (WIDTH + GAP + (SKY - z)) / stack);
+  };
+
   const hLine = (x0, x1, y) => {
-    const from = pitchToCell(Math.min(x0, x1), y);
-    const to = pitchToCell(Math.max(x0, x1), y);
+    const from = courtToCell(Math.min(x0, x1), y);
+    const to = courtToCell(Math.max(x0, x1), y);
     for (let col = from.col; col <= to.col; col += 1) paint(col, from.row, "is-line");
   };
 
   const vLine = (x, y0, y1) => {
-    const from = pitchToCell(x, Math.min(y0, y1));
-    const to = pitchToCell(x, Math.max(y0, y1));
+    const from = courtToCell(x, Math.min(y0, y1));
+    const to = courtToCell(x, Math.max(y0, y1));
     for (let row = from.row; row <= to.row; row += 1) paint(from.col, row, "is-line");
   };
 
@@ -137,6 +189,95 @@ export function createBadminton() {
     hLine(0, 1, 1 - SINGLES);
   };
 
+  const stroke = (x0, z0, x1, z1, tone) => {
+    const from = toSide(x0, z0);
+    const to = toSide(x1, z1);
+    const steps = Math.max(Math.abs(to.col - from.col), Math.abs(to.row - from.row), 1);
+    for (let index = 0; index <= steps; index += 1) {
+      const t = index / steps;
+      paint(
+        Math.round(from.col + (to.col - from.col) * t),
+        Math.round(from.row + (to.row - from.row) * t),
+        tone,
+      );
+    }
+  };
+
+  const drawElevation = (alpha) => {
+    stroke(0, 0, 1, 0, "is-line");
+    stroke(0, 0, 0, 0.45, "is-line");
+    stroke(1, 0, 1, 0.45, "is-line");
+    stroke(NET, 0, NET, 1.55, "is-white");
+    const flight = motion && phase === "flight" ? clamp(motion.age / Math.max(1, motion.duration), 0, 1) : null;
+    const shuttleX = spotOf(ball, alpha).x;
+    const shuttleZ = ball.pz + ((ball.z ?? ball.pz) - ball.pz) * (alpha < 1 ? alpha : 1);
+    const poseFor = (player) => {
+      if (phase === "between" && player === striker) return "serve";
+      if (!motion || flight == null) return "stand";
+      if (player === motion.hitter && flight < 0.28) return "hit";
+      if (player === motion.receiver && flight > 0.62) return "reach";
+      return "stand";
+    };
+    const drawPerson = (player) => {
+      const dir = player.side === "home" ? 1 : -1;
+      const tone = player.side === "home" ? "is-blue" : "is-red";
+      const x = spotOf(player, alpha).x;
+      const pose = poseFor(player);
+      const mx = (meters) => meters / LENGTH;
+      stroke(x - dir * mx(0.16), 0, x - dir * mx(0.04), 0.95, tone);
+      stroke(x + dir * mx(0.22), 0, x + dir * mx(0.04), 0.95, tone);
+      stroke(x, 0.95, x, 1.45, tone);
+      const headZ = 1.64;
+      for (let index = 0; index < 8; index += 1) {
+        const a0 = (index / 8) * Math.PI * 2;
+        const a1 = ((index + 1) / 8) * Math.PI * 2;
+        stroke(
+          x + Math.cos(a0) * mx(0.16),
+          headZ + Math.sin(a0) * 0.16,
+          x + Math.cos(a1) * mx(0.16),
+          headZ + Math.sin(a1) * 0.16,
+          tone,
+        );
+      }
+      const reach = (targetX, targetZ) => {
+        const dx = (targetX - x) * LENGTH;
+        const dz = targetZ - 1.38;
+        const dist = Math.hypot(dx, dz) || 1;
+        const scale = Math.min(1, 1.4 / dist);
+        const tipX = x + (dx * scale) / LENGTH;
+        const tipZ = 1.38 + dz * scale;
+        stroke(x, 1.38, tipX, tipZ, tone);
+        stroke(tipX, tipZ - 0.16, tipX + dir * mx(0.1), tipZ + 0.16, tone);
+      };
+      if (pose === "hit" || pose === "reach" || (pose === "serve" && player === striker)) reach(shuttleX, shuttleZ);
+      else if (pose === "serve") reach(x + dir * mx(0.45), 1.05);
+      else reach(x + dir * mx(0.22), 0.82);
+    };
+    players.forEach(drawPerson);
+    const charCols = Math.max(1, Math.floor(cols / 2));
+    const charRows = Math.max(1, Math.floor(rows / 4));
+    const sideTop = Math.floor(toSide(0.5, SKY).row / 4);
+    const sideBottom = Math.floor(toSide(0.5, 0).row / 4);
+    const charAt = (courtX, meters) => {
+      const dot = toSide(courtX, meters);
+      return {
+        col: clamp(Math.floor(dot.col / 2), 0, charCols - 1),
+        row: clamp(Math.floor(dot.row / 4), sideTop, sideBottom),
+      };
+    };
+    const stamp = (col, row, glyph, tone) => {
+      if (col < 0 || row < 0 || col >= charCols || row >= charRows) return;
+      cells[row * 4 * cols + col * 2] = { lit: true, tone, glyph };
+    };
+    confetti.forEach((bit) => {
+      const height = (1 - clamp(bit.y, 0, 1)) * (SKY - 0.35);
+      const spot = charAt(bit.x, height);
+      stamp(spot.col, spot.row, bit.glyph, bit.tone);
+    });
+    const shuttle = charAt(shuttleX, shuttleZ);
+    stamp(shuttle.col, shuttle.row, "●", "is-white");
+  };
+
   const capture = () => {
     players.forEach((player) => {
       player.px = player.x;
@@ -144,6 +285,7 @@ export function createBadminton() {
     });
     ball.px = ball.x;
     ball.py = ball.y;
+    ball.pz = ball.z;
   };
 
   const spotOf = (entity, alpha) => {
@@ -160,11 +302,12 @@ export function createBadminton() {
     drawCourt();
     const charCols = Math.max(1, Math.floor(cols / 2));
     const charRows = Math.max(1, Math.floor(rows / 4));
+    const courtLimit = Math.floor(courtToCell(0.5, 1).row / 4);
     const charAt = (x, y) => {
-      const dot = pitchToCell(x, y);
+      const dot = courtToCell(x, y);
       return {
         col: clamp(Math.floor(dot.col / 2), 0, charCols - 1),
-        row: clamp(Math.floor(dot.row / 4), 0, charRows - 1),
+        row: clamp(Math.floor(dot.row / 4), 0, courtLimit),
       };
     };
     const stamp = (col, row, glyph, tone) => {
@@ -181,7 +324,7 @@ export function createBadminton() {
       return spots;
     };
     const freeAt = (nameCol, nameRow, name, avoidBall) => cellsFor(nameCol, nameRow, name).every(([letterCol, letterRow]) => {
-      if (letterRow < 0 || letterRow >= charRows || letterCol < 0 || letterCol >= charCols) return false;
+      if (letterRow < 0 || letterRow > courtLimit || letterCol < 0 || letterCol >= charCols) return false;
       if (avoidBall && Math.abs(letterCol - ballChar.col) <= 1 && Math.abs(letterRow - ballChar.row) <= 1) return false;
       return !taken.has(`${letterCol},${letterRow}`)
         && !taken.has(`${letterCol - 1},${letterRow}`)
@@ -230,9 +373,9 @@ export function createBadminton() {
       const step = holder.side === "home" ? 1 : -1;
       const candidates = [step, -step].map((dir) => ({ col: carrier.col + dir, row: carrier.row }));
       const spot = candidates.find((item) => (
-        item.col >= 0 && item.row >= 0 && item.col < charCols && item.row < charRows
+        item.col >= 0 && item.row >= 0 && item.col < charCols && item.row <= courtLimit
         && !taken.has(`${item.col},${item.row}`)
-      )) || candidates.find((item) => item.col >= 0 && item.col < charCols);
+      )) || candidates.find((item) => item.col >= 0 && item.col < charCols && item.row <= courtLimit);
       if (spot) ballChar = spot;
     }
     stamp(ballChar.col, ballChar.row, "●", "is-white");
@@ -242,6 +385,7 @@ export function createBadminton() {
       if (cells[index]?.glyph) return;
       stamp(spot.col, spot.row, bit.glyph, bit.tone);
     });
+    drawElevation(alpha);
   };
 
   const clockText = () => {
@@ -281,20 +425,21 @@ export function createBadminton() {
 
   const shotLine = () => {
     if (!striker || !motion) return;
+    const tired = (motion.power ?? 1) < 0.72;
     if (motion.kind === "smash" || motion.kind === "winner") {
-      say(`${striker.name} smashes.`, striker.side, 14);
+      say(tired ? `${striker.name}'s smash has no sting.` : `${striker.name} smashes.`, striker.side, 14);
       return;
     }
     if (motion.kind === "clear") {
-      say(`${striker.name} sends up a clear.`, striker.side, 16);
+      say(tired ? `${striker.name} sends up a short clear.` : `${striker.name} sends up a clear.`, striker.side, 16);
       return;
     }
     if (motion.kind === "drop") {
-      say(`${striker.name} plays a drop at the net.`, striker.side, 16);
+      say(tired ? `${striker.name}'s drop falls short.` : `${striker.name} plays a drop at the net.`, striker.side, 16);
       return;
     }
     if (motion.kind === "drive") {
-      say(`${striker.name} drives it flat.`, striker.side, 14);
+      say(tired ? `${striker.name}'s drive loses pace.` : `${striker.name} drives it flat.`, striker.side, 14);
       return;
     }
     const where = striker.role === "front" ? "at the net" : "from the back";
@@ -336,16 +481,24 @@ export function createBadminton() {
     player.stamina = clamp((player.stamina ?? 100) + cost, 0, 100);
   };
 
-  const effort = (player, speed) => speed * (0.55 + 0.45 * ((player.stamina ?? 100) / 100));
+  const freshness = (player) => clamp((player.stamina ?? 100) / 100, 0, 1);
 
-  const moveToward = (player, x, y, speed) => {
+  const effort = (player, speed) => speed * (0.22 + 0.78 * freshness(player));
+
+  const moveToward = (player, x, y, speed, charge = true) => {
     const dx = x - player.x;
     const dy = y - player.y;
     const dist = Math.hypot(dx, dy);
-    if (dist < 0.001) return;
-    const step = Math.min(speed, dist);
-    player.x = clamp(player.x + (dx / dist) * step, 0.04, 0.96);
-    player.y = clamp(player.y + (dy / dist) * step, 0.06, 0.94);
+    const step = dist < 0.001 ? 0 : Math.min(speed, dist);
+    if (step > 0) {
+      player.x = clamp(player.x + (dx / dist) * step, 0.04, 0.96);
+      player.y = clamp(player.y + (dy / dist) * step, 0.06, 0.94);
+    }
+    if (!charge) return;
+    const extra = Math.max(0, step - 0.01);
+    if (phase === "between") spend(player, 0.9 - extra * 6);
+    else if (extra === 0) spend(player, 0.03);
+    else spend(player, -extra * 10);
   };
 
   const serveSpot = (side, right) => {
@@ -472,10 +625,8 @@ export function createBadminton() {
     const shots = [{ kind: "serve" }];
     const rally = ["clear", "drop", "drive", "smash"];
     const pick = () => rally[Math.floor(Math.random() * rally.length)];
-    const extra = Math.random();
-    if (extra < 0.82) shots.push({ kind: pick() });
-    if (extra < 0.46) shots.push({ kind: pick() });
-    if (extra < 0.18) shots.push({ kind: pick() });
+    const count = 8 + Math.floor(Math.random() * 5);
+    for (let index = 0; index < count; index += 1) shots.push({ kind: pick() });
     const end = Math.random();
     shots.push({ kind: end < 0.42 ? "winner" : end < 0.7 ? "net" : "out" });
     return shots;
@@ -484,26 +635,50 @@ export function createBadminton() {
   const beginShot = (snap) => {
     const shot = script[scriptIndex];
     const hitter = shot.kind.startsWith("serve") || shot.kind === "let" ? by(server, "back") : nextHitter;
+    let power = 0.2 + 0.8 * freshness(hitter);
     if (snap && hitter) {
-      hitter.x = clamp(ball.x, 0.06, 0.94);
-      hitter.y = clamp(ball.y, 0.08, 0.92);
+      const dx = ball.x - hitter.x;
+      const dy = ball.y - hitter.y;
+      const dist = Math.hypot(dx, dy);
+      const reach = 0.05 + 0.3 * freshness(hitter);
+      const step = Math.min(dist, reach);
+      if (dist > 0.001) {
+        hitter.x = clamp(hitter.x + (dx / dist) * step, 0.04, 0.96);
+        hitter.y = clamp(hitter.y + (dy / dist) * step, 0.06, 0.94);
+        spend(hitter, -step * 6);
+      }
+      const miss = Math.max(0, dist - reach);
+      power *= clamp(1 - miss / 0.4, 0.35, 1);
     }
     if (!shot.kind.startsWith("serve") && shot.kind !== "let") rallySlots();
     const spec = course(shot, hitter);
+    const played = { x: spec.to.x, y: spec.to.y };
+    const fixed = shot.kind === "net" || shot.kind === "out" || shot.kind === "winner"
+      || shot.kind === "serve-net" || shot.kind === "serve-out" || shot.kind === "let";
+    if (!fixed) {
+      const carry = 0.4 + 0.6 * power;
+      played.x = hitter.x + (spec.to.x - hitter.x) * carry;
+      played.y = hitter.y + (spec.to.y - hitter.y) * carry;
+    }
     motion = {
       kind: shot.kind,
       hitter,
       from: { x: hitter.x, y: hitter.y },
-      to: spec.to,
+      to: played,
       via: spec.via,
-      duration: spec.duration,
+      duration: Math.max(3, Math.round(spec.duration * (0.7 + 0.3 * power))),
       age: 0,
       receiver: spec.receiver,
+      power,
     };
     nextHitter = spec.receiver;
     phase = "flight";
     striker = hitter;
-    spend(hitter, shot.kind === "smash" || shot.kind === "winner" ? -2.2 : shot.kind.startsWith("serve") || shot.kind === "let" ? -1.1 : -1.5);
+    ball.x = hitter.x;
+    ball.y = hitter.y;
+    ball.z = heightOf(shot.kind, 0, power);
+    const cost = (SHOT_COST[shot.kind] || 2.2) * (0.35 + 0.65 * power);
+    spend(hitter, -cost);
     if (shot.kind === "serve") {
       recordParts([
         { text: sideName(server), tone: server },
@@ -561,7 +736,7 @@ export function createBadminton() {
     const winners = players.filter((player) => player.side === finale.side);
     winners.forEach((person, index) => {
       const spot = lapPoint(finale.tick * 0.004 + index / Math.max(1, winners.length));
-      moveToward(person, spot.x, spot.y, 0.018);
+      moveToward(person, spot.x, spot.y, 0.018, false);
     });
     confetti.forEach((bit) => {
       bit.x = clamp(bit.x + bit.vx, 0.02, 0.98);
@@ -653,7 +828,6 @@ export function createBadminton() {
 
   const walk = (speed) => {
     players.forEach((player) => {
-      spend(player, 0.04);
       moveToward(player, player.slotX, player.slotY, effort(player, speed));
     });
   };
@@ -663,6 +837,7 @@ export function createBadminton() {
     const point = sample(motion, motion.age / motion.duration);
     ball.x = point.x;
     ball.y = point.y;
+    ball.z = heightOf(motion.kind, motion.age / motion.duration, motion.power ?? 1);
     striker = motion.age <= 2 ? motion.hitter : null;
     const leaving = motion.kind === "out" || motion.kind === "serve-out";
     if (leaving && (ball.x <= 0.02 || ball.x >= 0.98 || ball.y <= 0.02 || ball.y >= 0.98)) {
@@ -673,20 +848,14 @@ export function createBadminton() {
     }
     players.forEach((player) => {
       if (player === motion.hitter) {
-        if (motion.age > 2) {
-          spend(player, 0.05);
-          moveToward(player, player.slotX, player.slotY, effort(player, 0.03));
-        }
+        if (motion.age > 2) moveToward(player, player.slotX, player.slotY, effort(player, 0.03));
         return;
       }
       if (player === motion.receiver) {
-        const late = motion.kind === "winner" || motion.kind === "smash";
-        spend(player, late ? -0.08 : -0.05);
         const speed = motion.kind === "winner" ? 0.012 : motion.kind === "smash" ? 0.04 : 0.05;
         moveToward(player, motion.to.x, motion.to.y, effort(player, speed));
         return;
       }
-      spend(player, 0.02);
       const y = clamp(player.slotY * 0.7 + ball.y * 0.3, 0.12, 0.88);
       moveToward(player, player.slotX, y, effort(player, 0.035));
     });
@@ -710,8 +879,10 @@ export function createBadminton() {
     const starter = by(server, "back");
     ball.x = starter.x;
     ball.y = starter.y;
+    ball.z = 1.05;
     ball.px = ball.x;
     ball.py = ball.y;
+    ball.pz = ball.z;
     phase = "between";
     pause = 16;
     striker = starter;
@@ -759,13 +930,10 @@ export function createBadminton() {
         const starter = by(server, "back");
         ball.x = starter.x;
         ball.y = starter.y;
+        ball.z = 1.05;
         striker = starter;
         pause -= 1;
         if (pause <= 0) {
-          players.forEach((player) => {
-            player.x = player.slotX;
-            player.y = player.slotY;
-          });
           script = buildScript();
           scriptIndex = 0;
           beginShot(false);
@@ -797,7 +965,15 @@ export function createBadminton() {
       return { text: voice.text, tone: voice.tone };
     },
     pitch() {
-      return { length: LENGTH, width: WIDTH };
+      return { length: LENGTH, width: WIDTH + GAP + SKY };
+    },
+    bands() {
+      const courtDot = courtToCell(0.5, 1).row;
+      const sideDot = toSide(0.5, SKY).row;
+      const charRows = Math.max(1, Math.floor(rows / 4));
+      const courtRows = Math.min(charRows, Math.floor(courtDot / 4) + 1);
+      const sideRow = Math.max(courtRows, Math.min(charRows, Math.floor(sideDot / 4)));
+      return { courtRows, sideRow };
     },
     hud() {
       return {

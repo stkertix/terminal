@@ -16,7 +16,7 @@
   grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
   align-items: end;
   gap: 12px;
-  margin-top: 8px;
+  margin: 8px 0;
   width: 0;
   min-width: 100%;
 }
@@ -106,10 +106,6 @@
 .play-view.is-badminton .play-call.is-foul { color: #ff9a3c; }
 .play-view.is-badminton .play-call.is-kick { color: #d8ffe8; }
 .play-view.is-badminton .play-call.is-neutral { color: #c6c6c6; }
-
-.play-view.is-badminton .play-stage {
-  width: max-content;
-}
 
 .play-view.is-badminton .play-log {
   position: relative;
