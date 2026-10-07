@@ -677,12 +677,12 @@ export function soccer() {
     const line = `Home ${homeScore}, Away ${awayScore}`;
     say(
       side
-        ? `${sideName(side)} win it. ${line}. Press any key.`
-        : `Full time, a draw. ${line}. Press any key.`,
+        ? `${sideName(side)} win it. ${line}.`
+        : `Full time, a draw. ${line}.`,
       side || "neutral",
       100000,
     );
-    banner = "Press any key";
+    banner = "Enter · new match    Esc · exit";
     bannerLeft = 100000;
   };
 

@@ -1,4 +1,5 @@
 import { createBadmintonView } from "./badminton/view.js";
+import { createMini4wdView } from "./mini4wd/view.js";
 import { createPadelView } from "./padel/view.js";
 import { createSoccerView } from "./soccer/view.js";
 
@@ -7,6 +8,7 @@ export function createPlayView(env) {
     soccer: createSoccerView(env),
     padel: createPadelView(env),
     badminton: createBadmintonView(env),
+    "mini-4wd": createMini4wdView(env),
   };
   let active = null;
 

@@ -1,4 +1,6 @@
 import { formatRemaining, compileStamp } from "../../format.js";
+import { listenPlayKeys, playNote } from "../flow.js";
+import { clearPlayLog, mountPlayLog, paintPlayLog } from "../log.js";
 import { soccer } from "./soccer.js";
 
 const BRAILLE_BIT = [
@@ -77,7 +79,9 @@ export function createSoccerView(env) {
   function start() {
     stop();
     env.scrollback.querySelectorAll(":scope > .output.play").forEach((node) => node.classList.remove("play"));
-    const sim = soccer();
+    let sim = soccer();
+    let started = false;
+    let detachKeys = () => {};
     const panel = document.createElement("div");
     panel.className = "output play";
     const view = document.createElement("div");
@@ -137,6 +141,7 @@ export function createSoccerView(env) {
     field.append(title, stage, bottom);
     const history = document.createElement("div");
     history.className = "play-log";
+    const log = mountPlayLog(history);
     view.append(field, history);
     panel.append(view);
     env.scrollback.insertBefore(panel, env.form);
@@ -165,57 +170,23 @@ export function createSoccerView(env) {
     const paint = () => {
       const board = sim.hud();
       scoreMark.textContent = ` ${board.home} - ${board.away} `;
-      noteMark.textContent = board.note || "";
+      noteMark.textContent = playNote(started, sim.holding, board.note);
       clockTime.textContent = board.time;
       clockPeriod.textContent = board.period;
       paintSide(homeCard, board.homePlayer, "is-home");
       paintSide(awayCard, board.awayPlayer, "is-away");
-      const line = sim.commentary();
+      const line = started ? sim.commentary() : { text: "Press Enter to start.", tone: "neutral" };
       caption.hidden = !line.text;
       caption.textContent = line.text;
       caption.className = line.text ? `play-call is-${line.tone}` : "play-call";
-      const capacity = Math.max(1, Math.floor((history.clientHeight || stage.clientHeight) / 14));
-      history.replaceChildren(...sim.feed().slice(-capacity).map((item) => {
-        const row = document.createElement("div");
-        if (item.divider) {
-          row.className = "play-log-line is-divider";
-          row.textContent = item.divider;
-          return row;
-        }
-        row.className = "play-log-line";
-        const time = document.createElement("span");
-        time.className = "play-log-time";
-        time.textContent = `${item.time} - `;
-        row.append(time);
-        item.parts.forEach((part) => {
-          const bit = document.createElement("span");
-          bit.className = `play-log-${part.tone}`;
-          bit.textContent = part.text;
-          row.append(bit);
-        });
-        return row;
-      }));
+      paintPlayLog(log, sim.feed());
       paintCells(spans, sim.cells(), gridCols);
-    };
-
-    let holding = false;
-    const dismiss = (event) => {
-      if (!holding || closed) return;
-      if (!env.element.classList.contains("is-active")) return;
-      if (event.target instanceof HTMLInputElement || event.target instanceof HTMLTextAreaElement) {
-        if (!env.element.contains(event.target)) return;
-      }
-      if (event.key === "Shift" || event.key === "Control" || event.key === "Alt" || event.key === "Meta") return;
-      event.preventDefault();
-      event.stopPropagation();
-      finish("Done");
     };
 
     const finish = (result) => {
       if (closed || !panel.isConnected) return;
       closed = true;
-      holding = false;
-      document.removeEventListener("keydown", dismiss, true);
+      detachKeys();
       stop();
       view.remove();
       const summary = document.createElement("div");
@@ -334,14 +305,41 @@ export function createSoccerView(env) {
     const tickMs = 80;
     let lastFrame = 0;
     let pending = 0;
+    const restart = () => {
+      sim = soccer();
+      clearPlayLog(log);
+      started = true;
+      pending = 0;
+      lastFrame = 0;
+      if (gridCols && gridRows) sim.reset(gridCols * 2, gridRows * 4);
+      paint();
+    };
+    detachKeys = listenPlayKeys(env, {
+      closed: () => closed,
+      waiting: () => !started,
+      finished: () => sim.holding,
+      start() {
+        started = true;
+        pending = 0;
+        lastFrame = 0;
+      },
+      again: restart,
+      exit: finish,
+    });
     const frame = (now) => {
       if (closed) return;
       if (!panel.isConnected) {
-        holding = false;
-        document.removeEventListener("keydown", dismiss, true);
+        detachKeys();
         playJob = null;
         stop();
         env.syncBusy();
+        return;
+      }
+      if (!started) {
+        pending = 0;
+        lastFrame = now;
+        paint();
+        playTimer = requestAnimationFrame(frame);
         return;
       }
       if (!lastFrame) lastFrame = now;
@@ -356,19 +354,11 @@ export function createSoccerView(env) {
       }
       if (!sim.done && !sim.holding) sim.present(pending / tickMs);
       paint();
-      if (sim.holding) {
-        if (!holding) {
-          holding = true;
-          document.addEventListener("keydown", dismiss, true);
-        }
+      if (sim.holding || !sim.done) {
         playTimer = requestAnimationFrame(frame);
         return;
       }
-      if (sim.done) {
-        finish("Done");
-        return;
-      }
-      playTimer = requestAnimationFrame(frame);
+      finish("Done");
     };
     playTimer = requestAnimationFrame(frame);
   }

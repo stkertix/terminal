@@ -1,7 +1,7 @@
 import { formatRemaining, compileStamp } from "../../format.js";
 import { listenPlayKeys, playNote } from "../flow.js";
 import { clearPlayLog, mountPlayLog, paintPlayLog } from "../log.js";
-import { createBadminton } from "./badminton.js";
+import { createMini4wd } from "./mini4wd.js";
 
 const BRAILLE_BIT = [
   [0x01, 0x08],
@@ -62,7 +62,7 @@ function paintCells(spans, cells, gridCols) {
   });
 }
 
-export function createBadmintonView(env) {
+export function createMini4wdView(env) {
   let playTimer = 0;
   let playFitObserver = null;
   let playJob = null;
@@ -79,22 +79,20 @@ export function createBadmintonView(env) {
   function start() {
     stop();
     env.scrollback.querySelectorAll(":scope > .output.play").forEach((node) => node.classList.remove("play"));
-    let sim = createBadminton();
+    let sim = createMini4wd();
     let started = false;
     let detachKeys = () => {};
     const panel = document.createElement("div");
     panel.className = "output play";
     const view = document.createElement("div");
-    view.className = "play-view is-badminton";
+    view.className = "play-view is-mini4wd";
     const title = document.createElement("div");
     title.className = "play-head";
     const homeMark = document.createElement("span");
-    homeMark.className = "play-team is-home";
-    homeMark.textContent = "HOME";
+    homeMark.className = "play-team";
     const scoreMark = document.createElement("span");
     const awayMark = document.createElement("span");
-    awayMark.className = "play-team is-away";
-    awayMark.textContent = "AWAY";
+    awayMark.className = "play-team";
     const scoreLine = document.createElement("div");
     scoreLine.className = "play-score";
     scoreLine.append(homeMark, scoreMark, awayMark);
@@ -115,16 +113,28 @@ export function createBadmintonView(env) {
       playerName.className = "play-side-name";
       const role = document.createElement("div");
       role.className = "play-side-role";
+      const meter = document.createElement("div");
+      meter.className = "play-meter";
+      const meterLabel = document.createElement("span");
+      meterLabel.className = "play-meter-label";
+      meterLabel.textContent = "Battery";
       const track = document.createElement("div");
       track.className = "play-stamina";
       const bar = document.createElement("div");
       bar.className = "play-stamina-bar";
+      const meterValue = document.createElement("span");
+      meterValue.className = "play-meter-value";
       track.append(bar);
-      card.append(playerName, role, track);
+      meter.append(meterLabel, track, meterValue);
+      const speed = document.createElement("div");
+      speed.className = "play-side-speed";
+      card.append(playerName, role, meter, speed);
       return card;
     };
-    const homeCard = makeSide("home");
-    const awayCard = makeSide("away");
+    const roster = document.createElement("div");
+    roster.className = "play-roster";
+    const cards = Array.from({ length: 4 }, () => makeSide("home"));
+    cards.forEach((card) => roster.append(card));
     const stage = document.createElement("div");
     stage.className = "play-stage";
     const plot = document.createElement("div");
@@ -134,7 +144,7 @@ export function createBadmintonView(env) {
     caption.hidden = true;
     const bottom = document.createElement("div");
     bottom.className = "play-bottom";
-    bottom.append(homeCard, caption, awayCard);
+    bottom.append(roster, caption);
     const field = document.createElement("div");
     field.className = "play-field";
     stage.append(plot);
@@ -153,28 +163,33 @@ export function createBadmintonView(env) {
     let gridCols = 0;
     let spans = [];
 
-    const paintSide = (card, player, team) => {
+    const paintSide = (card, player) => {
       card.hidden = !player;
       if (!player) return;
       const playerName = card.querySelector(".play-side-name");
-      playerName.className = `play-side-name ${team}`;
+      playerName.className = `play-side-name ${player.tone}`;
       playerName.textContent = player.name;
       card.querySelector(".play-side-role").textContent = player.role;
-      const value = Math.max(0, Math.min(100, player.stamina));
+      const value = Math.max(0, Math.min(100, player.battery));
       const mix = (from, to) => Math.round(from + (to - from) * (value / 100));
       const bar = card.querySelector(".play-stamina-bar");
       bar.style.width = `${value}%`;
       bar.style.background = `rgb(${mix(255, 61)}, ${mix(77, 214)}, ${mix(77, 140)})`;
+      card.querySelector(".play-meter-value").textContent = `${value}%`;
+      card.querySelector(".play-side-speed").textContent = `${player.speed.toFixed(1)} m/s`;
     };
 
     const paint = () => {
       const board = sim.hud();
-      scoreMark.textContent = ` ${board.home} - ${board.away} `;
+      homeMark.className = `play-team ${board.leaderTone}`;
+      homeMark.textContent = board.leader ? `1 ${board.leader}` : "";
+      scoreMark.textContent = board.gap ? ` ${board.gap} ` : "";
+      awayMark.className = `play-team ${board.chaserTone}`;
+      awayMark.textContent = board.chaser ? `2 ${board.chaser}` : "";
       noteMark.textContent = playNote(started, sim.holding, board.note);
       clockTime.textContent = board.time;
       clockPeriod.textContent = board.period;
-      paintSide(homeCard, board.homePlayer, "is-home");
-      paintSide(awayCard, board.awayPlayer, "is-away");
+      cards.forEach((card, index) => paintSide(card, board.field[index]));
       const line = started ? sim.commentary() : { text: "Press Enter to start.", tone: "neutral" };
       caption.hidden = !line.text;
       caption.textContent = line.text;
@@ -197,7 +212,7 @@ export function createBadmintonView(env) {
       summary.append(head);
       [
         ["Result", result],
-        ["Command", "play badminton"],
+        ["Command", "play mini-4wd"],
         ["Score", sim.score()],
         ["Size", gridCols && gridRows ? `${gridCols} × ${gridRows}` : ""],
         ["Time", formatRemaining(performance.now() - startedAt)],
@@ -304,7 +319,7 @@ export function createBadmintonView(env) {
     let lastFrame = 0;
     let pending = 0;
     const restart = () => {
-      sim = createBadminton();
+      sim = createMini4wd();
       clearPlayLog(log);
       started = true;
       pending = 0;

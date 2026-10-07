@@ -118,11 +118,10 @@
 }
 
 .play-view.is-soccer .play-log {
-  height: auto;
+  position: relative;
+  overflow: hidden;
   min-height: 0;
   align-self: stretch;
-  justify-content: flex-start;
-  padding-left: 12px;
   border-left: 1px solid #2a2a2a;
 }
 

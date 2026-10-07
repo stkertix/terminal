@@ -544,12 +544,12 @@ export function createBadminton() {
     finale = { side, tick: 0 };
     confetti = [];
     record("Full Time");
-    armBanner("Press any key", 100000);
+    armBanner("Enter · new match    Esc · exit", 100000);
     const line = `Home ${points.home}, Away ${points.away}`;
     say(
       side
-        ? `${sideName(side)} win the game. ${line}. Press any key.`
-        : `The game is level. ${line}. Press any key.`,
+        ? `${sideName(side)} win the game. ${line}.`
+        : `The game is level. ${line}.`,
       side || "neutral",
       100000,
     );

@@ -32,6 +32,16 @@
   white-space: pre-wrap;
 }
 
+.play-log-scroll {
+  position: absolute;
+  inset: 0;
+  overflow-x: hidden;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding-left: 12px;
+  box-sizing: border-box;
+}
+
 .play-row {
   height: 14px;
   line-height: 14px;

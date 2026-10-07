@@ -484,12 +484,12 @@ export function createPadel() {
     finale = { side, tick: 0 };
     confetti = [];
     record("Full Time");
-    armBanner("Press any key", 100000);
+    armBanner("Enter · new match    Esc · exit", 100000);
     const line = `Home ${games.home}, Away ${games.away}`;
     say(
       side
-        ? `${sideName(side)} win the set. ${line}. Press any key.`
-        : `The set is level. ${line}. Press any key.`,
+        ? `${sideName(side)} win the set. ${line}.`
+        : `The set is level. ${line}.`,
       side || "neutral",
       100000,
     );
