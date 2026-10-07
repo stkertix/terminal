@@ -54,3 +54,24 @@
   text-align: center;
   color: #8a8a8a;
 }
+
+.play-pick {
+  width: max-content;
+  margin: 8px 0;
+  color: #d0d0d0;
+}
+
+.play-pick-hint {
+  margin-bottom: 8px;
+  color: #9a9a9a;
+}
+
+.play-pick-item {
+  padding: 1px 8px;
+  color: #b5b5b5;
+}
+
+.play-pick-item.is-selected {
+  background: #163324;
+  color: #d8ffe8;
+}
