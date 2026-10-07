@@ -1,4 +1,11 @@
-export const GAMES = ["soccer", "padel", "badminton", "mini-4wd", "boxing", "chess"];
+export const GAMES = [
+  "badminton",
+  "boxing",
+  "chess",
+  "mini-4wd",
+  "padel",
+  "soccer",
+];
 
 export function playCommand(args) {
   if (args.length > 1) return `play: usage: play [${GAMES.join("|")}]`;
