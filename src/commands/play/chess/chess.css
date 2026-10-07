@@ -1,0 +1,179 @@
+.scrollback.is-play:has(.play-view.is-chess) {
+  overflow: hidden;
+}
+
+.play-view.is-chess {
+  grid-template-columns: max-content minmax(0, 1fr);
+  align-items: stretch;
+  column-gap: 16px;
+  width: 100%;
+  min-height: 100%;
+}
+
+.play-view.is-chess .play-field {
+  display: grid;
+  align-content: start;
+  width: 20.6em;
+}
+
+.play-view.is-chess .play-head {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+  align-items: start;
+  column-gap: 8px;
+  width: 100%;
+}
+
+.play-view.is-chess .play-score {
+  justify-self: start;
+  white-space: nowrap;
+}
+
+.play-view.is-chess .play-note {
+  justify-self: center;
+  text-align: center;
+  color: #b5b5b5;
+}
+
+.play-view.is-chess .play-clock-block {
+  justify-self: end;
+  text-align: right;
+  line-height: 1.3;
+}
+
+.play-view.is-chess .play-clock-time,
+.play-view.is-chess .play-period { color: #b5b5b5; }
+
+.play-view.is-chess .play-team.is-home,
+.play-view.is-chess .play-side-name.is-home { color: #f2f2f2; }
+
+.play-view.is-chess .play-team.is-away,
+.play-view.is-chess .play-side-name.is-away { color: #4da3ff; }
+
+.play-view.is-chess .play-side-role {
+  color: #b5b5b5;
+  white-space: pre-line;
+}
+
+.play-view.is-chess .play-bottom {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  align-items: end;
+  gap: 8px 12px;
+  margin-top: 8px;
+  width: 100%;
+}
+
+.play-view.is-chess .play-side.is-home { grid-column: 1; grid-row: 2; }
+.play-view.is-chess .play-side.is-away { grid-column: 2; grid-row: 2; }
+
+.play-view.is-chess .play-call {
+  grid-column: 1 / -1;
+  grid-row: 1;
+}
+
+.play-view.is-chess .play-side {
+  line-height: 1.35;
+  min-width: 0;
+}
+
+.play-view.is-chess .play-side.is-away { text-align: right; }
+
+.play-view.is-chess .play-side.is-turn .play-side-name { font-weight: 600; }
+
+.play-view.is-chess .play-stamina {
+  width: 8em;
+  height: 6px;
+  margin-top: 4px;
+  background: #1a1a1a;
+  overflow: hidden;
+}
+
+.play-view.is-chess .play-side.is-away .play-stamina { margin-left: auto; }
+
+.play-view.is-chess .play-stamina-bar { height: 100%; }
+
+.play-view.is-chess .play-call {
+  text-align: center;
+  white-space: normal;
+  max-width: none;
+  justify-self: stretch;
+  font-size: 15px;
+  font-weight: 500;
+  line-height: 1.35;
+  color: #d0d0d0;
+}
+
+.play-view.is-chess .play-call[hidden] { display: none !important; }
+.play-view.is-chess .play-call.is-goal { color: #f5d76e; font-weight: 600; }
+.play-view.is-chess .play-call.is-home { color: #f2f2f2; }
+.play-view.is-chess .play-call.is-away { color: #4da3ff; }
+.play-view.is-chess .play-call.is-foul { color: #ff9a3c; }
+.play-view.is-chess .play-call.is-kick { color: #d8ffe8; }
+.play-view.is-chess .play-call.is-neutral { color: #c6c6c6; }
+
+.chess-board {
+  margin-top: 8px;
+  user-select: none;
+}
+
+.chess-row {
+  display: grid;
+  grid-template-columns: 1.4em repeat(8, 2.15em);
+  height: 2.15em;
+  line-height: 2.15em;
+}
+
+.chess-row.is-files { height: 1.4em; line-height: 1.4em; }
+
+.chess-lab,
+.chess-file {
+  color: #8a8a8a;
+  text-align: center;
+}
+
+.chess-sq {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 600;
+}
+
+.chess-sq.is-light { background: #2c2c2c; }
+.chess-sq.is-dark { background: #161616; }
+.chess-sq.is-white { color: #f7f7f7; }
+.chess-sq.is-black { color: #4da3ff; }
+.chess-sq.is-last.is-light { background: #1d4a34; }
+.chess-sq.is-last.is-dark { background: #163c2b; }
+.chess-sq.is-check { background: #6a2a2a; }
+
+.play-view.is-chess .play-log {
+  position: relative;
+  overflow: hidden;
+  min-height: 0;
+  align-self: stretch;
+  border-left: 1px solid #2a2a2a;
+}
+
+.play-view.is-chess .play-log-line.is-divider {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: #8d8d8d;
+}
+
+.play-view.is-chess .play-log-line.is-divider::before,
+.play-view.is-chess .play-log-line.is-divider::after {
+  content: "";
+  flex: 1;
+  height: 1px;
+  background: #3a3a3a;
+}
+
+.play-view.is-chess .play-log-time,
+.play-view.is-chess .play-log-neutral { color: #9a9a9a; }
+.play-view.is-chess .play-log-home { color: #f2f2f2; }
+.play-view.is-chess .play-log-away { color: #4da3ff; }
+.play-view.is-chess .play-log-goal { color: #3dd68c; }
+.play-view.is-chess .play-log-foul { color: #ff9a3c; }
+.play-view.is-chess .play-log-kick { color: #d8ffe8; }
