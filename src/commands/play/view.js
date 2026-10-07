@@ -1,3 +1,4 @@
+import { createBadmintonView } from "./badminton/view.js";
 import { createPadelView } from "./padel/view.js";
 import { createSoccerView } from "./soccer/view.js";
 
@@ -5,6 +6,7 @@ export function createPlayView(env) {
   const games = {
     soccer: createSoccerView(env),
     padel: createPadelView(env),
+    badminton: createBadmintonView(env),
   };
   let active = null;
 

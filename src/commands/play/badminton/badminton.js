@@ -1,15 +1,16 @@
-const LENGTH = 20;
-const WIDTH = 10;
-const POINT = ["0", "15", "30", "40"];
+const LENGTH = 13.4;
+const WIDTH = 6.1;
 const NET = 0.5;
-const SERVICE = 6.95 / 20;
-const ROLE = { net: "Net", back: "Back" };
+const SHORT = 1.98 / LENGTH;
+const LONG = 0.76 / LENGTH;
+const SINGLES = 0.46 / WIDTH;
+const ROLE = { front: "Front", back: "Back" };
 
 const ROSTER = [
-  { side: "home", role: "net", name: "Galan" },
-  { side: "home", role: "back", name: "Lebron" },
-  { side: "away", role: "net", name: "Coello" },
-  { side: "away", role: "back", name: "Tapia" },
+  { side: "home", role: "front", name: "Kevin" },
+  { side: "home", role: "back", name: "Marcus" },
+  { side: "away", role: "front", name: "Ahsan" },
+  { side: "away", role: "back", name: "Hendra" },
 ];
 
 const other = (side) => (side === "home" ? "away" : "home");
@@ -29,14 +30,14 @@ function sample(motion, t) {
   return { x: lerp(motion.via.x, motion.to.x, v), y: lerp(motion.via.y, motion.to.y, v) };
 }
 
-export function createPadel() {
+export function createBadminton() {
   let cols = 48;
   let rows = 40;
   let cells = [];
   let server = "home";
   let serveRight = true;
   let phase = "between";
-  let pause = 18;
+  let pause = 16;
   let clock = 0;
   let done = false;
   let live = false;
@@ -51,19 +52,18 @@ export function createPadel() {
   let bannerLeft = 0;
   let voice = { text: "", tone: "neutral", until: 0 };
   const points = { home: 0, away: 0 };
-  const games = { home: 0, away: 0 };
   const log = [];
   const players = ROSTER.map((slot) => ({
     ...slot,
-    x: slot.side === "home" ? 0.2 : 0.8,
-    y: slot.role === "net" ? 0.35 : 0.65,
+    x: slot.side === "home" ? 0.18 : 0.82,
+    y: slot.role === "front" ? 0.35 : 0.65,
     px: 0,
     py: 0,
     slotX: 0.5,
     slotY: 0.5,
     stamina: 100,
   }));
-  const ball = { x: 0.08, y: 0.75, px: 0.08, py: 0.75 };
+  const ball = { x: 0.1, y: 0.74, px: 0.1, py: 0.74 };
 
   const by = (side, role) => players.find((player) => player.side === side && player.role === role);
   const sideName = (side) => (side === "home" ? "Home" : "Away");
@@ -122,13 +122,19 @@ export function createPadel() {
     hLine(0, 1, 1);
     vLine(0, 0, 1);
     vLine(1, 0, 1);
-    const homeLine = NET - SERVICE;
-    const awayLine = NET + SERVICE;
-    vLine(homeLine, 0, 1);
-    vLine(awayLine, 0, 1);
-    hLine(homeLine, NET, 0.5);
-    hLine(NET, awayLine, 0.5);
+    const shortHome = NET - SHORT;
+    const shortAway = NET + SHORT;
+    const longHome = LONG;
+    const longAway = 1 - LONG;
+    vLine(shortHome, 0, 1);
+    vLine(shortAway, 0, 1);
+    vLine(longHome, 0, 1);
+    vLine(longAway, 0, 1);
     vLine(NET, 0, 1);
+    hLine(0, shortHome, 0.5);
+    hLine(shortAway, 1, 0.5);
+    hLine(0, 1, SINGLES);
+    hLine(0, 1, 1 - SINGLES);
   };
 
   const capture = () => {
@@ -245,7 +251,11 @@ export function createPadel() {
     return `${mm}:${ss}`;
   };
 
-  const periodText = () => (finale ? "Full Time" : `Set ${games.home}-${games.away}`);
+  const periodText = () => {
+    if (finale) return "Full Time";
+    if (points.home >= 20 && points.away >= 20) return "Setting";
+    return "Game";
+  };
 
   const recordParts = (parts) => {
     log.push({ time: clockText(), parts });
@@ -269,14 +279,37 @@ export function createPadel() {
     bannerLeft = ticks;
   };
 
+  const shotLine = () => {
+    if (!striker || !motion) return;
+    if (motion.kind === "smash" || motion.kind === "winner") {
+      say(`${striker.name} smashes.`, striker.side, 14);
+      return;
+    }
+    if (motion.kind === "clear") {
+      say(`${striker.name} sends up a clear.`, striker.side, 16);
+      return;
+    }
+    if (motion.kind === "drop") {
+      say(`${striker.name} plays a drop at the net.`, striker.side, 16);
+      return;
+    }
+    if (motion.kind === "drive") {
+      say(`${striker.name} drives it flat.`, striker.side, 14);
+      return;
+    }
+    const where = striker.role === "front" ? "at the net" : "from the back";
+    say(`${striker.name} plays it ${where}.`, striker.side, 16);
+  };
+
   const fillVoice = () => {
     if (phase === "between") {
       const taker = by(server, "back");
-      say(`${taker.name} to serve for ${sideName(server)}.`, "kick", 24);
+      const box = serveRight ? "right" : "left";
+      say(`${taker.name} to serve from the ${box} for ${sideName(server)}.`, "kick", 24);
       return;
     }
-    if (motion?.kind === "wall") {
-      say("The ball comes off the glass.", "kick", 16);
+    if (motion?.kind === "let") {
+      say("The serve clips the net.", "kick", 14);
       return;
     }
     if (motion?.kind === "serve" || motion?.kind === "serve-out" || motion?.kind === "serve-net") {
@@ -284,11 +317,10 @@ export function createPadel() {
       return;
     }
     if (striker) {
-      const where = striker.role === "net" ? "at the net" : "from the back";
-      say(`${striker.name} plays it ${where}.`, striker.side, 18);
+      shotLine();
       return;
     }
-    say("The rally stays up.", "neutral", 16);
+    say("The rally stays up.", "neutral", 14);
   };
 
   const narrate = () => {
@@ -316,126 +348,147 @@ export function createPadel() {
     player.y = clamp(player.y + (dy / dist) * step, 0.06, 0.94);
   };
 
-  const serveSpot = (side, right) => (
-    side === "home"
-      ? { x: 0.08, y: right ? 0.75 : 0.25 }
-      : { x: 0.92, y: right ? 0.25 : 0.75 }
-  );
+  const serveSpot = (side, right) => {
+    const x = side === "home" ? 0.1 : 0.9;
+    const y = right
+      ? (side === "home" ? 0.74 : 0.26)
+      : (side === "home" ? 0.26 : 0.74);
+    return { x, y };
+  };
 
-  const serviceTarget = (side, right) => (
-    side === "home"
-      ? { x: 0.68, y: right ? 0.3 : 0.7 }
-      : { x: 0.32, y: right ? 0.7 : 0.3 }
-  );
+  const serviceTarget = (side, right) => {
+    const span = Math.max(0.08, 0.5 - SHORT - LONG - 0.08);
+    const inset = 0.03 + Math.random() * span;
+    const x = side === "home" ? NET + SHORT + inset : NET - SHORT - inset;
+    const near = 0.16 + Math.random() * 0.24;
+    const far = 0.6 + Math.random() * 0.24;
+    const y = right
+      ? (side === "home" ? near : far)
+      : (side === "home" ? far : near);
+    return { x: clamp(x, 0.08, 0.92), y };
+  };
 
   const closer = (side, spot) => {
-    const net = by(side, "net");
+    const front = by(side, "front");
     const back = by(side, "back");
-    const netDist = Math.hypot(net.slotX - spot.x, net.slotY - spot.y);
+    const frontDist = Math.hypot(front.slotX - spot.x, front.slotY - spot.y);
     const backDist = Math.hypot(back.slotX - spot.x, back.slotY - spot.y);
-    return netDist <= backDist ? net : back;
+    return frontDist <= backDist ? front : back;
   };
 
   const placeServe = () => {
     const spot = serveSpot(server, serveRight);
     const back = by(server, "back");
-    const net = by(server, "net");
+    const front = by(server, "front");
     const receiver = by(other(server), "back");
-    const oppNet = by(other(server), "net");
-    const partnerY = spot.y > 0.5 ? 0.28 : 0.72;
+    const oppFront = by(other(server), "front");
+    const partnerY = spot.y > 0.5 ? 0.3 : 0.7;
     back.slotX = spot.x;
     back.slotY = spot.y;
     if (server === "home") {
-      net.slotX = 0.36;
-      net.slotY = partnerY;
+      front.slotX = 0.36;
+      front.slotY = partnerY;
       receiver.slotX = 0.88;
-      receiver.slotY = spot.y > 0.5 ? 0.32 : 0.68;
-      oppNet.slotX = 0.64;
-      oppNet.slotY = partnerY > 0.5 ? 0.32 : 0.68;
+      receiver.slotY = spot.y > 0.5 ? 0.3 : 0.7;
+      oppFront.slotX = 0.64;
+      oppFront.slotY = partnerY > 0.5 ? 0.32 : 0.68;
     } else {
-      net.slotX = 0.64;
-      net.slotY = partnerY;
+      front.slotX = 0.64;
+      front.slotY = partnerY;
       receiver.slotX = 0.12;
-      receiver.slotY = spot.y > 0.5 ? 0.32 : 0.68;
-      oppNet.slotX = 0.36;
-      oppNet.slotY = partnerY > 0.5 ? 0.32 : 0.68;
+      receiver.slotY = spot.y > 0.5 ? 0.3 : 0.7;
+      oppFront.slotX = 0.36;
+      oppFront.slotY = partnerY > 0.5 ? 0.32 : 0.68;
     }
   };
 
   const rallySlots = () => {
-    by("home", "net").slotX = 0.36;
-    by("home", "net").slotY = 0.34;
+    by("home", "front").slotX = 0.38;
+    by("home", "front").slotY = 0.36;
     by("home", "back").slotX = 0.14;
     by("home", "back").slotY = 0.68;
-    by("away", "net").slotX = 0.64;
-    by("away", "net").slotY = 0.66;
+    by("away", "front").slotX = 0.62;
+    by("away", "front").slotY = 0.64;
     by("away", "back").slotX = 0.86;
     by("away", "back").slotY = 0.32;
   };
 
-  const landIn = (side) => {
-    const nearNet = side === "home" ? 0.4 : 0.6;
-    const back = side === "home" ? 0.1 : 0.9;
+  const landIn = (side, kind) => {
+    const y = 0.12 + Math.random() * 0.76;
+    if (kind === "drop") {
+      return { x: side === "home" ? 0.4 + Math.random() * 0.06 : 0.54 + Math.random() * 0.06, y };
+    }
+    if (kind === "clear") {
+      return { x: side === "home" ? 0.06 + Math.random() * 0.1 : 0.84 + Math.random() * 0.1, y };
+    }
+    if (kind === "smash" || kind === "winner") {
+      return {
+        x: side === "home" ? 0.16 + Math.random() * 0.22 : 0.62 + Math.random() * 0.22,
+        y: 0.16 + Math.random() * 0.68,
+      };
+    }
     return {
-      x: lerp(nearNet, back, 0.25 + Math.random() * 0.65),
-      y: 0.14 + Math.random() * 0.72,
+      x: side === "home" ? 0.14 + Math.random() * 0.28 : 0.58 + Math.random() * 0.28,
+      y,
     };
   };
 
   const course = (shot, hitter) => {
     const side = hitter.side;
-    if (shot.kind === "serve") {
+    if (shot.kind === "serve" || shot.kind === "let") {
       const to = serviceTarget(side, serveRight);
-      return { to, via: null, duration: 8, receiver: closer(other(side), to) };
+      const via = shot.kind === "let" ? { x: NET, y: clamp((hitter.y + to.y) / 2, 0.2, 0.8) } : null;
+      return { to, via, duration: shot.kind === "let" ? 8 : 6, receiver: closer(other(side), to) };
     }
     if (shot.kind === "serve-net" || shot.kind === "net") {
       return {
-        to: { x: NET, y: clamp(hitter.y, 0.18, 0.82) },
+        to: { x: NET, y: clamp(hitter.y, 0.16, 0.84) },
         via: null,
-        duration: 7,
+        duration: 5,
         receiver: null,
       };
     }
     if (shot.kind === "serve-out" || shot.kind === "out") {
+      const wide = Math.random() < 0.35;
       return {
-        to: { x: side === "home" ? 1.14 : -0.14, y: 0.2 + Math.random() * 0.6 },
+        to: wide
+          ? { x: side === "home" ? 0.72 : 0.28, y: Math.random() < 0.5 ? -0.12 : 1.12 }
+          : { x: side === "home" ? 1.12 : -0.12, y: 0.15 + Math.random() * 0.7 },
         via: null,
-        duration: 7,
+        duration: 6,
         receiver: null,
       };
     }
-    if (shot.kind === "wall") {
-      const to = landIn(other(side));
-      const sideGlass = Math.random() < 0.7;
-      const via = sideGlass
-        ? { x: side === "home" ? 0.62 + Math.random() * 0.24 : 0.14 + Math.random() * 0.24, y: to.y > 0.5 ? 0.98 : 0.02 }
-        : { x: side === "home" ? 0.98 : 0.02, y: 0.2 + Math.random() * 0.6 };
-      return { to, via, duration: 12, receiver: closer(other(side), to) };
-    }
-    const to = landIn(other(side));
-    return { to, via: null, duration: 8, receiver: closer(other(side), to) };
+    const to = landIn(other(side), shot.kind);
+    const duration = shot.kind === "smash" || shot.kind === "winner" ? 4 : shot.kind === "clear" ? 10 : shot.kind === "drop" ? 8 : 6;
+    return { to, via: null, duration, receiver: closer(other(side), to) };
   };
 
   const buildScript = () => {
     const tired = (by(server, "back").stamina ?? 100) < 45;
-    if (Math.random() < (tired ? 0.16 : 0.08)) return [{ kind: Math.random() < 0.5 ? "serve-net" : "serve-out" }];
-    const shots = [{ kind: "serve" }];
-    const extra = Math.random();
-    if (extra < 0.72) shots.push({ kind: Math.random() < 0.7 ? "wall" : "drive" });
-    if (extra < 0.38) shots.push({ kind: Math.random() < 0.55 ? "drive" : "wall" });
     const roll = Math.random();
-    shots.push({ kind: roll < 0.46 ? "double" : roll < 0.73 ? "net" : "out" });
+    if (roll < 0.05) return [{ kind: "let" }];
+    if (roll < (tired ? 0.18 : 0.1)) return [{ kind: Math.random() < 0.45 ? "serve-net" : "serve-out" }];
+    const shots = [{ kind: "serve" }];
+    const rally = ["clear", "drop", "drive", "smash"];
+    const pick = () => rally[Math.floor(Math.random() * rally.length)];
+    const extra = Math.random();
+    if (extra < 0.82) shots.push({ kind: pick() });
+    if (extra < 0.46) shots.push({ kind: pick() });
+    if (extra < 0.18) shots.push({ kind: pick() });
+    const end = Math.random();
+    shots.push({ kind: end < 0.42 ? "winner" : end < 0.7 ? "net" : "out" });
     return shots;
   };
 
   const beginShot = (snap) => {
     const shot = script[scriptIndex];
-    const hitter = shot.kind.startsWith("serve") ? by(server, "back") : nextHitter;
+    const hitter = shot.kind.startsWith("serve") || shot.kind === "let" ? by(server, "back") : nextHitter;
     if (snap && hitter) {
       hitter.x = clamp(ball.x, 0.06, 0.94);
       hitter.y = clamp(ball.y, 0.08, 0.92);
     }
-    if (!shot.kind.startsWith("serve")) rallySlots();
+    if (!shot.kind.startsWith("serve") && shot.kind !== "let") rallySlots();
     const spec = course(shot, hitter);
     motion = {
       kind: shot.kind,
@@ -445,13 +498,12 @@ export function createPadel() {
       via: spec.via,
       duration: spec.duration,
       age: 0,
-      hop: false,
       receiver: spec.receiver,
     };
     nextHitter = spec.receiver;
     phase = "flight";
     striker = hitter;
-    spend(hitter, shot.kind.startsWith("serve") ? -1.2 : -1.6);
+    spend(hitter, shot.kind === "smash" || shot.kind === "winner" ? -2.2 : shot.kind.startsWith("serve") || shot.kind === "let" ? -1.1 : -1.5);
     if (shot.kind === "serve") {
       recordParts([
         { text: sideName(server), tone: server },
@@ -461,10 +513,18 @@ export function createPadel() {
     }
   };
 
-  const setOver = () => {
-    const hi = Math.max(games.home, games.away);
-    const lo = Math.min(games.home, games.away);
-    return hi >= 6 && hi - lo >= 2;
+  const gameWon = (side) => {
+    const mine = points[side];
+    const theirs = points[other(side)];
+    if (mine >= 30) return true;
+    return mine >= 21 && mine - theirs >= 2;
+  };
+
+  const wouldWin = (side) => {
+    const mine = points[side] + 1;
+    const theirs = points[other(side)];
+    if (mine >= 30) return true;
+    return mine >= 21 && mine - theirs >= 2;
   };
 
   const lapPoint = (t) => {
@@ -480,16 +540,16 @@ export function createPadel() {
     motion = null;
     striker = null;
     phase = "end";
-    const side = games.home === games.away ? null : (games.home > games.away ? "home" : "away");
+    const side = points.home === points.away ? null : (points.home > points.away ? "home" : "away");
     finale = { side, tick: 0 };
     confetti = [];
     record("Full Time");
     armBanner("Press any key", 100000);
-    const line = `Home ${games.home}, Away ${games.away}`;
+    const line = `Home ${points.home}, Away ${points.away}`;
     say(
       side
-        ? `${sideName(side)} win the set. ${line}. Press any key.`
-        : `The set is level. ${line}. Press any key.`,
+        ? `${sideName(side)} win the game. ${line}. Press any key.`
+        : `The game is level. ${line}. Press any key.`,
       side || "neutral",
       100000,
     );
@@ -526,45 +586,49 @@ export function createPadel() {
   const award = (winner, reason) => {
     motion = null;
     striker = null;
-    const label = reason === "DOUBLE BOUNCE" ? "double bounce" : reason.toLowerCase();
+    points[winner] += 1;
+    const label = reason === "WINNER" ? "winner" : reason.toLowerCase();
     const tone = reason === "NET" || reason === "OUT" ? "foul" : "goal";
-    if (points[winner] >= 3) {
-      games[winner] += 1;
-      points.home = 0;
-      points.away = 0;
+    if (gameWon(winner)) {
       recordParts([
         { text: sideName(winner), tone: winner },
         { text: " game", tone: "goal" },
-        { text: `  ${games.home}-${games.away}`, tone: "neutral" },
+        { text: `  ${points.home}-${points.away}`, tone: "neutral" },
       ]);
-      armBanner("Game", 22);
-      say(`${sideName(winner)} take the game, ${games.home}-${games.away}.`, winner, 22);
-      if (setOver()) {
-        beginFinale();
-        return;
-      }
-      server = other(server);
-      serveRight = true;
-      phase = "between";
-      pause = 22;
+      beginFinale();
       return;
     }
-    points[winner] += 1;
     recordParts([
       { text: sideName(winner), tone: winner },
       { text: ` ${label}`, tone },
-      { text: `  ${POINT[points.home]}-${POINT[points.away]}`, tone: "neutral" },
+      { text: `  ${points.home}-${points.away}`, tone: "neutral" },
     ]);
     armBanner(label.replace(/\b\w/g, (letter) => letter.toUpperCase()), 12);
-    say(`${sideName(winner)} ${label}. ${POINT[points.home]}-${POINT[points.away]}.`, winner, 16);
-    serveRight = !serveRight;
+    const setting = points.home === 20 && points.away === 20;
+    const gamePoint = wouldWin("home") || wouldWin("away");
+    let line = `${sideName(winner)} ${label}. ${points.home}-${points.away}.`;
+    if (setting) line = `Setting. Two clear. ${line}`;
+    else if (gamePoint) line = `${line} Game point.`;
+    say(line, winner, 16);
+    server = winner;
+    serveRight = points[server] % 2 === 0;
     phase = "between";
-    pause = 16;
+    pause = 14;
   };
 
   const arrive = () => {
     const kind = motion.kind;
     const hitterSide = motion.hitter.side;
+    if (kind === "let") {
+      motion = null;
+      striker = null;
+      recordParts([{ text: "Let", tone: "kick" }]);
+      armBanner("Let", 12);
+      say("Let. The serve is taken again.", "kick", 16);
+      phase = "between";
+      pause = 14;
+      return;
+    }
     if (kind === "net" || kind === "serve-net") {
       award(other(hitterSide), "NET");
       return;
@@ -573,33 +637,15 @@ export function createPadel() {
       award(other(hitterSide), "OUT");
       return;
     }
-    if (kind === "double") {
-      if (!motion.hop) {
-        const dir = hitterSide === "home" ? 1 : -1;
-        motion = {
-          ...motion,
-          from: { x: motion.to.x, y: motion.to.y },
-          to: {
-            x: clamp(motion.to.x + dir * 0.14, 0.08, 0.92),
-            y: clamp(motion.to.y + (Math.random() - 0.5) * 0.18, 0.1, 0.9),
-          },
-          via: null,
-          duration: 5,
-          age: 0,
-          hop: true,
-        };
-        ball.x = motion.from.x;
-        ball.y = motion.from.y;
-        return;
-      }
-      award(hitterSide, "DOUBLE BOUNCE");
+    if (kind === "winner") {
+      award(hitterSide, "WINNER");
       return;
     }
     scriptIndex += 1;
     ball.x = motion.to.x;
     ball.y = motion.to.y;
     if (scriptIndex >= script.length) {
-      award(hitterSide, "DOUBLE BOUNCE");
+      award(hitterSide, "WINNER");
       return;
     }
     beginShot(true);
@@ -619,9 +665,9 @@ export function createPadel() {
     ball.y = point.y;
     striker = motion.age <= 2 ? motion.hitter : null;
     const leaving = motion.kind === "out" || motion.kind === "serve-out";
-    if (leaving && (ball.x <= 0.02 || ball.x >= 0.98)) {
+    if (leaving && (ball.x <= 0.02 || ball.x >= 0.98 || ball.y <= 0.02 || ball.y >= 0.98)) {
       ball.x = clamp(ball.x, 0, 1);
-      ball.y = clamp(ball.y, 0.04, 0.96);
+      ball.y = clamp(ball.y, 0, 1);
       arrive();
       return;
     }
@@ -634,8 +680,9 @@ export function createPadel() {
         return;
       }
       if (player === motion.receiver) {
-        spend(player, motion.kind === "double" ? -0.03 : -0.05);
-        const speed = motion.kind === "double" ? 0.012 : 0.05;
+        const late = motion.kind === "winner" || motion.kind === "smash";
+        spend(player, late ? -0.08 : -0.05);
+        const speed = motion.kind === "winner" ? 0.012 : motion.kind === "smash" ? 0.04 : 0.05;
         moveToward(player, motion.to.x, motion.to.y, effort(player, speed));
         return;
       }
@@ -651,9 +698,7 @@ export function createPadel() {
     serveRight = true;
     points.home = 0;
     points.away = 0;
-    games.home = 0;
-    games.away = 0;
-    markPeriod("Set");
+    markPeriod("Game");
     placeServe();
     players.forEach((player) => {
       player.x = player.slotX;
@@ -668,9 +713,9 @@ export function createPadel() {
     ball.px = ball.x;
     ball.py = ball.y;
     phase = "between";
-    pause = 18;
+    pause = 16;
     striker = starter;
-    armBanner("Serve", 18);
+    armBanner("Serve", 16);
   };
 
   const cardFor = (side) => {
@@ -756,8 +801,8 @@ export function createPadel() {
     },
     hud() {
       return {
-        home: finale ? games.home : POINT[points.home],
-        away: finale ? games.away : POINT[points.away],
+        home: points.home,
+        away: points.away,
         time: clockText(),
         period: periodText(),
         note: banner,
@@ -767,10 +812,10 @@ export function createPadel() {
     },
     title() {
       const note = banner ? `  ${banner}` : "";
-      return `padel  HOME ${POINT[points.home]} - ${POINT[points.away]} AWAY  ${clockText()}  ${periodText()}${note}`;
+      return `badminton  HOME ${points.home} - ${points.away} AWAY  ${clockText()}  ${periodText()}${note}`;
     },
     score() {
-      return `HOME ${games.home} - ${games.away} AWAY`;
+      return `HOME ${points.home} - ${points.away} AWAY`;
     },
     get done() {
       return done;

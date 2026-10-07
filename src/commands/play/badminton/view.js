@@ -1,5 +1,5 @@
 import { formatRemaining, compileStamp } from "../../format.js";
-import { createPadel } from "./padel.js";
+import { createBadminton } from "./badminton.js";
 
 const BRAILLE_BIT = [
   [0x01, 0x08],
@@ -60,7 +60,7 @@ function paintCells(spans, cells, gridCols) {
   });
 }
 
-export function createPadelView(env) {
+export function createBadmintonView(env) {
   let playTimer = 0;
   let playFitObserver = null;
   let playJob = null;
@@ -77,11 +77,11 @@ export function createPadelView(env) {
   function start() {
     stop();
     env.scrollback.querySelectorAll(":scope > .output.play").forEach((node) => node.classList.remove("play"));
-    const sim = createPadel();
+    const sim = createBadminton();
     const panel = document.createElement("div");
     panel.className = "output play";
     const view = document.createElement("div");
-    view.className = "play-view is-padel";
+    view.className = "play-view is-badminton";
     const title = document.createElement("div");
     title.className = "play-head";
     const homeMark = document.createElement("span");
@@ -226,7 +226,7 @@ export function createPadelView(env) {
       summary.append(head);
       [
         ["Result", result],
-        ["Command", "play padel"],
+        ["Command", "play badminton"],
         ["Score", sim.score()],
         ["Size", gridCols && gridRows ? `${gridCols} × ${gridRows}` : ""],
         ["Time", formatRemaining(performance.now() - startedAt)],

@@ -1,4 +1,4 @@
-export const GAMES = ["soccer", "padel"];
+export const GAMES = ["soccer", "padel", "badminton"];
 
 export function playCommand(args) {
   if (args.length > 1) return `play: usage: play [${GAMES.join("|")}]`;
