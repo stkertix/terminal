@@ -273,7 +273,7 @@ export function createMini4wdView(env) {
       probe.remove();
       const pitch = sim.pitch();
       const rowH = 14;
-      const logPx = 42 * ch + 16;
+      const logPx = 34 * ch + 16;
       const maxW = Math.max(ch * 16, roomW - logPx);
       const maxH = Math.max(rowH * 8, roomH);
       const dotX = ch / 2;

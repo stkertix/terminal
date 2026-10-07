@@ -290,8 +290,14 @@ export function createChessView(env) {
       view.style.minHeight = `${Math.max(360, roomH)}px`;
       const chrome = title.offsetHeight + bottom.offsetHeight + 28;
       const label = 22;
+      const probe = document.createElement("span");
+      probe.className = "play-cell";
+      probe.textContent = "0";
+      view.append(probe);
+      const ch = probe.getBoundingClientRect().width || 8;
+      probe.remove();
       const byH = Math.floor((roomH - chrome) / 8);
-      const byW = Math.floor((roomW * 0.72 - label) / 8);
+      const byW = Math.floor((roomW - (34 * ch + 16) - label) / 8);
       const size = Math.max(48, Math.min(byH, byW, 88));
       boardHost.style.setProperty("--sq", `${size}px`);
       field.style.width = `${label + size * 8}px`;

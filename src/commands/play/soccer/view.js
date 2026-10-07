@@ -282,7 +282,7 @@ export function createSoccerView(env) {
       const sideFull = 8;
       const sideMin = 3;
       const fieldMin = 6;
-      const logPx = 42 * ch + 16;
+      const logPx = 34 * ch + 16;
       const maxW = Math.max(ch * 16, roomW - logPx);
       const budget = Math.floor(Math.max(0, roomH) / rowH);
       let sideRows = sideFull;

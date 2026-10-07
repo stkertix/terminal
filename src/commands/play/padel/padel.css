@@ -1,5 +1,6 @@
 .play-view.is-padel {
-  grid-template-columns: max-content minmax(0, 1fr);
+  grid-template-columns: max-content minmax(12ch, 34ch);
+  justify-content: start;
   align-items: stretch;
   column-gap: 16px;
   width: 100%;
