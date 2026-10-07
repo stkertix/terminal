@@ -1,0 +1,143 @@
+.scrollback.is-play:has(.play-view.is-boxing) {
+  overflow: hidden;
+}
+
+.play-view.is-boxing {
+  grid-template-columns: max-content minmax(0, 1fr);
+  align-items: stretch;
+  column-gap: 16px;
+  width: 100%;
+}
+
+.play-view.is-boxing .play-field {
+  display: grid;
+  align-content: start;
+  width: max-content;
+}
+
+.play-view.is-boxing .play-bottom {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+  align-items: end;
+  gap: 12px;
+  margin: 8px 0;
+  width: 0;
+  min-width: 100%;
+}
+
+.play-view.is-boxing .play-bottom .play-side.is-home { grid-column: 1; }
+.play-view.is-boxing .play-bottom .play-call { grid-column: 2; }
+.play-view.is-boxing .play-bottom .play-side.is-away { grid-column: 3; }
+
+.play-view.is-boxing .play-head {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+  align-items: start;
+  column-gap: 12px;
+  width: 0;
+  min-width: 100%;
+}
+
+.play-view.is-boxing .play-score { justify-self: start; }
+
+.play-view.is-boxing .play-note {
+  justify-self: center;
+  text-align: center;
+  color: #b5b5b5;
+}
+
+.play-view.is-boxing .play-clock-block {
+  justify-self: end;
+  text-align: right;
+  line-height: 1.3;
+}
+
+.play-view.is-boxing .play-clock-time,
+.play-view.is-boxing .play-period { color: #b5b5b5; }
+
+.play-view.is-boxing .play-team.is-home,
+.play-view.is-boxing .play-side-name.is-home { color: #4da3ff; }
+
+.play-view.is-boxing .play-team.is-away,
+.play-view.is-boxing .play-side-name.is-away { color: #ff4d4d; }
+
+.play-view.is-boxing .play-side-role { color: #b5b5b5; }
+
+.play-view.is-boxing .play-side {
+  line-height: 1.35;
+  min-width: 0;
+}
+
+.play-view.is-boxing .play-side.is-away {
+  text-align: right;
+}
+
+.play-view.is-boxing .play-stamina {
+  width: 8em;
+  height: 6px;
+  margin-top: 4px;
+  background: #1a1a1a;
+  overflow: hidden;
+}
+
+.play-view.is-boxing .play-side.is-away .play-stamina {
+  margin-left: auto;
+}
+
+.play-view.is-boxing .play-stamina-bar {
+  height: 100%;
+}
+
+.play-view.is-boxing .play-call {
+  text-align: center;
+  white-space: normal;
+  max-width: 34ch;
+  justify-self: center;
+  align-self: end;
+  font-size: 15px;
+  font-weight: 500;
+  line-height: 1.35;
+  color: #d0d0d0;
+}
+
+.play-view.is-boxing .play-call[hidden] {
+  display: none !important;
+}
+
+.play-view.is-boxing .play-call.is-goal { color: #f5d76e; font-weight: 600; }
+.play-view.is-boxing .play-call.is-home { color: #4da3ff; }
+.play-view.is-boxing .play-call.is-away { color: #ff4d4d; }
+.play-view.is-boxing .play-call.is-foul { color: #ff9a3c; }
+.play-view.is-boxing .play-call.is-kick { color: #d8ffe8; }
+.play-view.is-boxing .play-call.is-neutral { color: #c6c6c6; }
+
+.play-view.is-boxing .play-log {
+  position: relative;
+  overflow: hidden;
+  min-height: 0;
+  align-self: stretch;
+  border-left: 1px solid #2a2a2a;
+}
+
+.play-view.is-boxing .play-log-line.is-divider {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: #8d8d8d;
+}
+
+.play-view.is-boxing .play-log-line.is-divider::before,
+.play-view.is-boxing .play-log-line.is-divider::after {
+  content: "";
+  flex: 1;
+  height: 1px;
+  background: #3a3a3a;
+}
+
+.play-view.is-boxing .play-log-time,
+.play-view.is-boxing .play-log-neutral { color: #9a9a9a; }
+.play-view.is-boxing .play-log-home { color: #4da3ff; }
+.play-view.is-boxing .play-log-away { color: #ff4d4d; }
+.play-view.is-boxing .play-log-goal { color: #3dd68c; }
+.play-view.is-boxing .play-log-foul { color: #ff9a3c; }
+.play-view.is-boxing .play-log-kick { color: #d8ffe8; }
