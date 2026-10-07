@@ -681,7 +681,7 @@ export function createBadminton() {
     spend(hitter, -cost);
     if (shot.kind === "serve") {
       recordParts([
-        { text: sideName(server), tone: server },
+        { text: hitter.name, tone: server },
         { text: " serve", tone: "kick" },
       ]);
       armBanner("Serve", 10);
@@ -758,15 +758,26 @@ export function createBadminton() {
     }
   };
 
+  const actorOn = (side) => {
+    const hitter = motion?.hitter;
+    if (hitter?.side === side) return hitter;
+    const receiver = motion?.receiver;
+    if (receiver?.side === side) return receiver;
+    const spot = motion?.to || { x: ball.x, y: ball.y };
+    return closer(side, spot);
+  };
+
   const award = (winner, reason) => {
+    const actor = actorOn(winner);
     motion = null;
     striker = null;
     points[winner] += 1;
     const label = reason === "WINNER" ? "winner" : reason.toLowerCase();
     const tone = reason === "NET" || reason === "OUT" ? "foul" : "goal";
+    const who = actor?.name || sideName(winner);
     if (gameWon(winner)) {
       recordParts([
-        { text: sideName(winner), tone: winner },
+        { text: who, tone: winner },
         { text: " game", tone: "goal" },
         { text: `  ${points.home}-${points.away}`, tone: "neutral" },
       ]);
@@ -774,7 +785,7 @@ export function createBadminton() {
       return;
     }
     recordParts([
-      { text: sideName(winner), tone: winner },
+      { text: who, tone: winner },
       { text: ` ${label}`, tone },
       { text: `  ${points.home}-${points.away}`, tone: "neutral" },
     ]);
